@@ -1,5 +1,6 @@
 package com.rvz.incidentservice.service.impl;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -8,13 +9,17 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.rvz.incidentservice.client.MasterDataClient;
 import com.rvz.incidentservice.dto.request.CreateIncidentRequest;
 import com.rvz.incidentservice.dto.request.UpdateIncidentRequest;
 import com.rvz.incidentservice.dto.response.IncidentResponse;
 import com.rvz.incidentservice.entity.Incident;
+import com.rvz.incidentservice.entity.IncidentAttachment;
+import com.rvz.incidentservice.exception.IncidentException;
 import com.rvz.incidentservice.exception.ResourceNotFoundException;
+import com.rvz.incidentservice.repository.IncidentAttachmentRepository;
 import com.rvz.incidentservice.repository.IncidentRepository;
 import com.rvz.incidentservice.service.IncidentService;
 
@@ -23,11 +28,12 @@ public class IncidentServiceImpl implements IncidentService {
 
     private final IncidentRepository incidentRepository;
     private final MasterDataClient   masterDataClient;
-
+    private final IncidentAttachmentRepository attachmentRepository;
     public IncidentServiceImpl(IncidentRepository incidentRepository,
-                               MasterDataClient masterDataClient) {
+                               MasterDataClient masterDataClient,IncidentAttachmentRepository attachmentRepository) {
         this.incidentRepository = incidentRepository;
         this.masterDataClient   = masterDataClient;
+        this.attachmentRepository =attachmentRepository;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -328,5 +334,41 @@ public List<IncidentResponse> getAllIncidents() {
             })
             .collect(Collectors.toList());
 }
+
+@Override
+public void saveAttachment(Long incidentId, MultipartFile file) {
+    try {
+        IncidentAttachment attachment = attachmentRepository
+                .findByIncidentId(incidentId)
+                .orElse(new IncidentAttachment());
+ 
+        attachment.setIncidentId(incidentId);
+        attachment.setFileName(file.getOriginalFilename());
+        attachment.setFileType(file.getContentType());
+        attachment.setFileSize(file.getSize());
+        attachment.setFileData(file.getBytes());
+ 
+        attachmentRepository.save(attachment);
+ 
+        // Also store filename reference on incident for quick display
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Incident not found: " + incidentId));
+        incident.setAttachmentPath(file.getOriginalFilename());
+        incident.setUpdatedAt(LocalDateTime.now());
+        incidentRepository.save(incident);
+ 
+    } catch (IOException e) {
+        throw new IncidentException("Failed to save attachment: " + e.getMessage());
+    }
+}
+ 
+@Override
+public IncidentAttachment getAttachment(Long incidentId) {
+    return attachmentRepository.findByIncidentId(incidentId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    "No attachment found for incident: " + incidentId));
+}
+ 
 
 }

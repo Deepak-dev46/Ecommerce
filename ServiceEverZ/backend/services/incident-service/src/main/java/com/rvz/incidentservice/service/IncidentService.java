@@ -1,10 +1,13 @@
 package com.rvz.incidentservice.service;
 
+import java.util.List;
+
+import org.springframework.web.multipart.MultipartFile;
+
 import com.rvz.incidentservice.dto.request.CreateIncidentRequest;
 import com.rvz.incidentservice.dto.request.UpdateIncidentRequest;
 import com.rvz.incidentservice.dto.response.IncidentResponse;
-
-import java.util.List;
+import com.rvz.incidentservice.entity.IncidentAttachment;
 
 public interface IncidentService {
 
@@ -25,4 +28,10 @@ public interface IncidentService {
 
     /** All incidents — for admin/support dashboard */
     List<IncidentResponse> getAllIncidents();
+    
+    void saveAttachment(Long incidentId, MultipartFile file);
+    
+    /** Retrieve attachment for an incident */
+    IncidentAttachment getAttachment(Long incidentId);
+
 }

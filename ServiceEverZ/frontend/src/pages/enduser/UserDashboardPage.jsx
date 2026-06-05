@@ -491,7 +491,7 @@ export default function UserDashboardPage() {
           startIcon={!isMobile && <PlayCircle sx={{ fontSize: 16 }} />}
           size="small"
           sx={{
-            bgcolor: '#fff', color: '#27235C', fontWeight: 700,
+            bgcolor: '#fff', color: '#ffffff', fontWeight: 700,
             borderRadius: 2, px: { xs: 1.2, sm: 2 }, py: 0.7,
             fontSize: { xs: 10, sm: 12 },
             boxShadow: '0 2px 10px rgba(0,0,0,0.12)',

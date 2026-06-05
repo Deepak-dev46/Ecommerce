@@ -1,6 +1,3 @@
-// ================================================================
-//  SERVICE URLS — exact ports from application.properties files
-// ================================================================
 export const SERVICE_URLS = {
   MASTER:     'http://localhost:8081',   // master-data-service  → port 8081
   TICKET:     'http://localhost:8082',   // ticket-service       → port 8082

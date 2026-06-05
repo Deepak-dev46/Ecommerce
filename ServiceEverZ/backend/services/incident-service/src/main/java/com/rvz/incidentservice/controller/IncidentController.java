@@ -1,16 +1,32 @@
 package com.rvz.incidentservice.controller;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.rvz.incidentservice.dto.ApiResponse;
 import com.rvz.incidentservice.dto.request.CreateIncidentRequest;
 import com.rvz.incidentservice.dto.request.UpdateIncidentRequest;
 import com.rvz.incidentservice.dto.response.IncidentResponse;
+import com.rvz.incidentservice.entity.IncidentAttachment;
 import com.rvz.incidentservice.service.IncidentService;
+
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * REST endpoints for Incident tickets.
@@ -34,15 +50,32 @@ public class IncidentController {
         this.incidentService = incidentService;
     }
 
-    /** Create and immediately submit an incident */
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<IncidentResponse>> createIncident(
-            @Valid @RequestBody CreateIncidentRequest request) {
+            @RequestPart("data") @Valid CreateIncidentRequest request,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+     
         IncidentResponse data = incidentService.createIncident(request);
+     
+        // Save file to MySQL after incident is created
+        if (file != null && !file.isEmpty()) {
+            incidentService.saveAttachment(data.getIncidentId(), file);
+            data.setAttachmentPath(file.getOriginalFilename());
+        }
+     
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ok("Incident created and assigned successfully", data));
     }
 
+    @GetMapping("/{incidentId}/attachment")
+    public ResponseEntity<byte[]> downloadAttachment(@PathVariable Long incidentId) {
+        IncidentAttachment attachment = incidentService.getAttachment(incidentId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(attachment.getFileType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + attachment.getFileName() + "\"")
+                .body(attachment.getFileData());
+    }
     /** Fetch a single incident by its id */
     @GetMapping("/{incidentId}")
     public ResponseEntity<ApiResponse<IncidentResponse>> getIncident(

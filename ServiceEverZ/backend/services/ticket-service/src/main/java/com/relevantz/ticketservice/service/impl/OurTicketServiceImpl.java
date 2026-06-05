@@ -1063,8 +1063,6 @@ public class OurTicketServiceImpl implements OurTicketService {
 //		a.setFile(req.getAttachmentName());
 //		attachmentRepo.save(a);
 //	}
-//   
-	
 	private void saveAttachment(Long ticketId, CreateTicketRequest req) {
 	    if (req.getAttachmentName() == null || req.getAttachmentName().isBlank()) {
 	        return;
