@@ -10,7 +10,7 @@ import { otpSchema } from '../../validations/loginSchema';
 import { authApi } from '../../api/authApi';
 import { useAuth } from '../../context/AuthContext';
 
-const OTP_TTL = 30;
+const OTP_TTL = 120;
 const OTP_LENGTH = 6;
 
 // ── OTP Box Input ─────────────────────────────────────────────────────────────

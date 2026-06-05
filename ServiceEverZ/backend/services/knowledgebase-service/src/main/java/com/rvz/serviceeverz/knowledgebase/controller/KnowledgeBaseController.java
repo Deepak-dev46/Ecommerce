@@ -17,7 +17,7 @@ import java.util.List;
  
 @RestController
 @RequestMapping("/api/kb")
-@CrossOrigin(origins="http://localhost:5173")
+@CrossOrigin
 public class KnowledgeBaseController {
  
     private final KnowledgeBaseService service;

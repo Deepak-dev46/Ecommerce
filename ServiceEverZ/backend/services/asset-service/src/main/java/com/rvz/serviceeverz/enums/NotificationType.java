@@ -1,5 +1,7 @@
 package com.rvz.serviceeverz.enums;
+
 public enum NotificationType {
+    // Asset mapping workflow
     MAPPING_REQUEST_RECEIVED_BY_SP,
     SP_REQUESTS_ADDITIONAL_DETAILS,
     SP_APPROVED_SENT_TO_MANAGER,
@@ -9,5 +11,13 @@ public enum NotificationType {
     MANAGER_REJECTED_NOTIFY_SP,
     MANAGER_REJECTED_NOTIFY_USER,
     SP_REJECTED_NOTIFY_USER,
-    RENTAL_EXPIRY_WARNING
+
+    // Rental
+    RENTAL_EXPIRY_WARNING,
+
+    // Backup scheduling
+    BACKUP_SCHEDULED,
+    BACKUP_INITIATED,
+    BACKUP_COMPLETED,
+    BACKUP_UPCOMING_REMINDER
 }

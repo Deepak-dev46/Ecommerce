@@ -22,11 +22,13 @@ import com.rvz.serviceeverz.entity.KnownErrorRecord;
 import com.rvz.serviceeverz.entity.Problem;
 import com.rvz.serviceeverz.entity.ProblemCategory;
 import com.rvz.serviceeverz.entity.ProblemIncidentLink;
+import com.rvz.serviceeverz.dto.response.ProblemAttachmentResponse;
 import com.rvz.serviceeverz.enums.ProblemPriority;
 import com.rvz.serviceeverz.enums.ProblemStatus;
 import com.rvz.serviceeverz.exception.ProblemNotFoundException;
 import com.rvz.serviceeverz.notification.ProblemNotificationService;
 import com.rvz.serviceeverz.repository.KnownErrorRecordRepository;
+import com.rvz.serviceeverz.repository.ProblemAttachmentRepository;
 import com.rvz.serviceeverz.repository.ProblemCategoryRepository;
 import com.rvz.serviceeverz.repository.ProblemIncidentLinkRepository;
 import com.rvz.serviceeverz.repository.ProblemRepository;
@@ -42,6 +44,7 @@ public class ProblemServiceImpl implements ProblemService {
     private final ProblemSubCategoryRepository  subCategoryRepo;
     private final ProblemIncidentLinkRepository linkRepo;
     private final KnownErrorRecordRepository    kerRepo;
+    private final ProblemAttachmentRepository   attachmentRepo;
     private final IncidentFeignClient           incidentClient;
     private final UserFeignClient               userClient;
     private final ProblemNotificationService    notifService;
@@ -51,6 +54,7 @@ public class ProblemServiceImpl implements ProblemService {
                               ProblemSubCategoryRepository subCategoryRepo,
                               ProblemIncidentLinkRepository linkRepo,
                               KnownErrorRecordRepository kerRepo,
+                              ProblemAttachmentRepository attachmentRepo,
                               IncidentFeignClient incidentClient,
                               UserFeignClient userClient,
                               ProblemNotificationService notifService) {
@@ -59,6 +63,7 @@ public class ProblemServiceImpl implements ProblemService {
         this.subCategoryRepo = subCategoryRepo;
         this.linkRepo        = linkRepo;
         this.kerRepo         = kerRepo;
+        this.attachmentRepo  = attachmentRepo;
         this.incidentClient  = incidentClient;
         this.userClient      = userClient;
         this.notifService    = notifService;
@@ -143,6 +148,25 @@ public class ProblemServiceImpl implements ProblemService {
                 return dto;
             }).collect(Collectors.toList());
         r.setLinkedIncidents(links);
+
+        // Populate attachment metadata for all sections
+        List<ProblemAttachmentResponse> attachments = attachmentRepo.findByProblemId(p.getId())
+            .stream().map(a -> {
+                ProblemAttachmentResponse ar = new ProblemAttachmentResponse();
+                ar.setId(a.getId());
+                ar.setProblemId(p.getId());
+                ar.setProblemNumber(p.getProblemNumber());
+                ar.setSection(a.getSection());
+                ar.setOriginalFileName(a.getOriginalFileName());
+                ar.setContentType(a.getContentType());
+                ar.setFileSize(a.getFileSize());
+                ar.setUploadedBySpId(a.getUploadedBySpId());
+                ar.setUploadedAt(a.getUploadedAt());
+                // downloadUrl is set by the controller layer
+                return ar;
+            }).collect(Collectors.toList());
+        r.setAttachments(attachments);
+
         return r;
     }
  

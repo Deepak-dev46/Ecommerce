@@ -17,4 +17,6 @@ public interface RetentionPolicyRepository extends JpaRepository<RetentionPolicy
     boolean existsByPolicyNameIgnoreCase(String policyName);
 
     List<RetentionPolicy> findAllByCreatedByManagerId(Long managerId);
+
+    List<RetentionPolicy> findAllByTypeAndIsActiveTrue(com.rvz.serviceeverz.enums.RetentionType type);
 }

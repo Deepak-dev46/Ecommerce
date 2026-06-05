@@ -1,33 +1,35 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box, Typography, Button, TextField, Select, MenuItem,
-  FormControl, InputLabel, Grid, Paper, CircularProgress,
-  Divider, FormControlLabel, Checkbox, RadioGroup, Radio,
-  FormHelperText, Chip, Stack, Collapse,
+  FormControl, FormHelperText, Grid, Paper, CircularProgress,
+  Divider, FormControlLabel, Checkbox, Stack, Chip,
+  LinearProgress, Tooltip, IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import BusinessIcon from '@mui/icons-material/Business';
-import StorageIcon from '@mui/icons-material/Storage';
 import HandshakeIcon from '@mui/icons-material/Handshake';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined';
-import RemoveCircleOutlineOutlinedIcon from '@mui/icons-material/RemoveCircleOutlineOutlined';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import TuneIcon from '@mui/icons-material/Tune';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useNavigate, useParams } from 'react-router-dom';
-import { addAsset, updateAsset, updateAssetStatus, getAssetById } from '../../api/assetApi';
+import {
+  addAsset, updateAsset, updateAssetStatus, getAssetById,
+  getSpecTemplate, uploadInvoice,
+} from '../../api/assetApi';
 import { validateAssetForm } from '../../utils/validators';
 import toast from '../../utils/toast';
 
 /* ── Google Fonts – Roboto ────────────────────────────────────────────── */
 const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap%27';
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap';
 fontLink.rel = 'stylesheet';
 if (!document.head.querySelector('[href*="Roboto"]')) document.head.appendChild(fontLink);
 
@@ -42,45 +44,18 @@ const STATUSES = [
 ];
 const DEFAULT_SP_ID = '1';
 const today = new Date().toISOString().split('T')[0];
+const ACCEPTED_INVOICE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+const MAX_INVOICE_SIZE_MB = 10;
 
 const empty = {
   name: '', category: '', brand: '', model: '', serialNumber: '',
-  location: '', notes: '', additionalInfo: '', addedBySpId: DEFAULT_SP_ID,
+  location: '', addedBySpId: DEFAULT_SP_ID,
   ownershipType: 'OWNED', status: 'AVAILABLE',
-  purchaseDate: '', purchaseCost: '', warrantyExpiryDate: '', depreciationRatePercent: '',
+  purchaseDate: '', purchaseCost: '', warrantyExpiryDate: '',
   rentalVendorName: '', rentalVendorContact: '', rentalContractNumber: '',
   rentalVendorEmail: '',
   rentalStartDate: '', rentalEndDate: '', rentalCostPerMonth: '',
   rentalDepositAmount: '', rentalRenewalOption: false, rentalReturnCondition: '',
-};
-
-/* ── Quill toolbar config ──────────────────────────────────────────────── */
-const quillModules = {
-  toolbar: [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ size: ['small', false, 'large', 'huge'] }],
-    [{ color: [] }, { background: [] }],
-    [{ align: [] }],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    [{ indent: '-1' }, { indent: '+1' }],
-    ['link'],
-    ['clean'],
-  ],
-};
-/* ── Helpers ──────────────────────────────────────────────────────────── */
-const toAlphanumeric = (v, strict = false) =>
-  strict ? v.replace(/[^A-Za-z0-9\-]/g, '') : v.replace(/[^A-Za-z0-9 ]/g, '');
-
-const validateVendorContact = (v) => {
-  if (!v?.trim()) return '';
-  return /^(\+\d{1,3})?[\s\-]?\d{10}$/.test(v.trim())
-    ? '' : 'Enter a valid 10-digit mobile number';
-};
-
-const validateVendorEmail = (v) => {
-  if (!v?.trim()) return '';
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-    ? '' : 'Enter a valid email address';
 };
 
 /* ── Design tokens ────────────────────────────────────────────────────── */
@@ -106,19 +81,14 @@ const sectionHeaderSx = (color = BRAND) => ({
   px: 3, py: 1.5,
   background: `linear-gradient(135deg, ${color}08 0%, ${color}04 100%)`,
   borderBottom: `1px solid ${BORDER}`,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 1.5,
+  display: 'flex', alignItems: 'center', gap: 1.5,
 });
 
 const inputSx = {
   fontFamily: FONT,
   '& .MuiOutlinedInput-root': {
-    borderRadius: '10px',
-    fontFamily: FONT,
-    fontSize: '0.875rem',
-    backgroundColor: '#FAFBFF',
-    transition: 'box-shadow 0.2s, border-color 0.2s',
+    borderRadius: '10px', fontFamily: FONT, fontSize: '0.875rem',
+    backgroundColor: '#FAFBFF', transition: 'box-shadow 0.2s, border-color 0.2s',
     '&:hover fieldset': { borderColor: BRAND },
     '&.Mui-focused fieldset': { borderColor: BRAND, borderWidth: '2px' },
     '&.Mui-error fieldset': { borderColor: '#E01950' },
@@ -140,8 +110,7 @@ function SectionHeader({ icon, title, subtitle, color = BRAND }) {
       <Box sx={{
         width: 36, height: 36, borderRadius: '10px',
         background: `linear-gradient(135deg, ${color}22, ${color}11)`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color,
       }}>
         {React.cloneElement(icon, { sx: { fontSize: 18 } })}
       </Box>
@@ -186,6 +155,22 @@ function StatusBadge({ status }) {
   );
 }
 
+/* ── Helpers ──────────────────────────────────────────────────────────── */
+const toAlphanumeric = (v, strict = false) =>
+  strict ? v.replace(/[^A-Za-z0-9\-]/g, '') : v.replace(/[^A-Za-z0-9 ]/g, '');
+
+const validateVendorContact = (v) => {
+  if (!v?.trim()) return '';
+  return /^(\+\d{1,3})?[\s\-]?\d{10}$/.test(v.trim())
+    ? '' : 'Enter a valid 10-digit mobile number';
+};
+
+const validateVendorEmail = (v) => {
+  if (!v?.trim()) return '';
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+    ? '' : 'Enter a valid email address';
+};
+
 /* ── Main Component ───────────────────────────────────────────────────── */
 export default function AssetFormPage() {
   const navigate = useNavigate();
@@ -198,8 +183,41 @@ export default function AssetFormPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEdit);
   const [originalStatus, setOriginalStatus] = useState(null);
-  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
 
+  /* ── Specifications state ─────────────────────────────────────────── */
+  const [specTemplate, setSpecTemplate] = useState({});
+  const [specTemplateLoading, setSpecTemplateLoading] = useState(false);
+  const [specs, setSpecs] = useState([]);
+
+  /* ── Invoice state ────────────────────────────────────────────────── */
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [invoiceUrl, setInvoiceUrl] = useState('');
+  const [invoiceFileName, setInvoiceFileName] = useState('');
+  const [invoiceUploading, setInvoiceUploading] = useState(false);
+  const invoiceInputRef = useRef(null);
+
+  /* ── Load spec template when category changes ─────────────────────── */
+  useEffect(() => {
+    if (!form.category) { setSpecTemplate({}); return; }
+    setSpecTemplateLoading(true);
+    getSpecTemplate(form.category)
+      .then(r => {
+        const fields = r.data?.data?.fields || {};
+        setSpecTemplate(fields);
+        setSpecs(prev => {
+          const existing = {};
+          prev.forEach(s => { existing[s.specKey] = s.specValue; });
+          return Object.entries(fields).map(([key]) => ({
+            specKey: key,
+            specValue: existing[key] || '',
+          }));
+        });
+      })
+      .catch(() => setSpecTemplate({}))
+      .finally(() => setSpecTemplateLoading(false));
+  }, [form.category]);
+
+  /* ── Load asset for edit ──────────────────────────────────────────── */
   useEffect(() => {
     if (!isEdit) return;
     setFetching(true);
@@ -211,13 +229,12 @@ export default function AssetFormPage() {
         setForm({
           name: a.name || '', category: a.category || '', brand: a.brand || '',
           model: a.model || '', serialNumber: a.serialNumber || '',
-          location: a.location || '', notes: a.notes || '',
+          location: a.location || '',
           addedBySpId: a.addedBySpId || DEFAULT_SP_ID,
           ownershipType: a.ownershipType || 'OWNED',
           status: loadedStatus,
           purchaseDate: a.purchaseDate || '', purchaseCost: a.purchaseCost || '',
           warrantyExpiryDate: a.warrantyExpiryDate || '',
-          depreciationRatePercent: a.depreciationRatePercent || '',
           rentalVendorName: a.rentalVendorName || '',
           rentalVendorContact: a.rentalVendorContact || '',
           rentalContractNumber: a.rentalContractNumber || '',
@@ -227,8 +244,11 @@ export default function AssetFormPage() {
           rentalDepositAmount: a.rentalDepositAmount || '',
           rentalRenewalOption: a.rentalRenewalOption || false,
           rentalReturnCondition: a.rentalReturnCondition || '',
-          additionalInfo: a.additionalInfo || '',
         });
+        if (a.invoiceUrl) { setInvoiceUrl(a.invoiceUrl); setInvoiceFileName(a.invoiceFileName || 'Invoice'); }
+        if (Array.isArray(a.specifications) && a.specifications.length > 0) {
+          setSpecs(a.specifications.map(s => ({ specKey: s.specKey, specValue: s.specValue })));
+        }
       })
       .catch(() => toast.error('Failed to load asset'))
       .finally(() => setFetching(false));
@@ -238,7 +258,7 @@ export default function AssetFormPage() {
 
   const set = (field) => (e) => {
     let value = e.target.value;
-    if (['name', 'brand', 'rentalVendorName', 'rentalReturnCondition', 'notes'].includes(field))
+    if (['name', 'brand', 'rentalVendorName', 'rentalReturnCondition'].includes(field))
       value = toAlphanumeric(value);
     if (field === 'model') value = value.replace(/[^a-zA-Z0-9]/g, '');
     if (['serialNumber', 'rentalContractNumber'].includes(field))
@@ -271,6 +291,47 @@ export default function AssetFormPage() {
     return e;
   };
 
+  /* ── Spec handlers ────────────────────────────────────────────────── */
+  const handleSpecChange = (idx, value) => {
+    setSpecs(prev => prev.map((s, i) => i === idx ? { ...s, specValue: value } : s));
+  };
+
+  /* ── Invoice handlers ─────────────────────────────────────────────── */
+  const handleInvoiceSelect = async (file) => {
+    if (!file) return;
+    if (!ACCEPTED_INVOICE_TYPES.includes(file.type)) {
+      toast.error('Only PDF, JPG, or PNG files are accepted for invoices.');
+      return;
+    }
+    if (file.size > MAX_INVOICE_SIZE_MB * 1024 * 1024) {
+      toast.error(`Invoice file must be under ${MAX_INVOICE_SIZE_MB}MB.`);
+      return;
+    }
+    setInvoiceFile(file);
+    setInvoiceUploading(true);
+    try {
+      const res = await uploadInvoice(file);
+      const { invoiceUrl: url, invoiceFileName: name } = res.data.data;
+      setInvoiceUrl(url);
+      setInvoiceFileName(name);
+      setInvoiceFile(null);
+      toast.success('Invoice uploaded successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Invoice upload failed.');
+      setInvoiceFile(null);
+    } finally {
+      setInvoiceUploading(false);
+    }
+  };
+
+  const handleRemoveInvoice = () => {
+    setInvoiceUrl('');
+    setInvoiceFileName('');
+    setInvoiceFile(null);
+    if (invoiceInputRef.current) invoiceInputRef.current.value = '';
+  };
+
+  /* ── Submit ───────────────────────────────────────────────────────── */
   const handleSubmit = async () => {
     const allTouched = {};
     ['name', 'category', 'location', 'addedBySpId', 'serialNumber',
@@ -283,26 +344,32 @@ export default function AssetFormPage() {
       toast.error('Please fix the validation errors before submitting.');
       return;
     }
+    if (invoiceUploading) {
+      toast.error('Please wait for the invoice upload to complete.');
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
         ...form,
-        additionalInfo: form.additionalInfo || null,
         addedBySpId: Number(form.addedBySpId),
         purchaseCost: form.purchaseCost ? Number(form.purchaseCost) : null,
-        depreciationRatePercent: form.depreciationRatePercent ? Number(form.depreciationRatePercent) : null,
         rentalCostPerMonth: form.rentalCostPerMonth ? Number(form.rentalCostPerMonth) : null,
         rentalDepositAmount: form.rentalDepositAmount ? Number(form.rentalDepositAmount) : null,
         rentalVendorEmail: form.rentalVendorEmail || null,
+        invoiceUrl: invoiceUrl || null,
+        invoiceFileName: invoiceFileName || null,
+        specifications: specs.filter(s => s.specValue?.trim()).map(s => ({
+          specKey: s.specKey,
+          specValue: s.specValue.trim(),
+        })),
       };
       if (isEdit) {
         await updateAsset(id, payload);
-        // Status is managed by a dedicated endpoint — call it separately if changed
         if (form.status && form.status !== originalStatus) {
           try {
             await updateAssetStatus(id, form.status);
           } catch (statusErr) {
-            // Show backend's specific message (e.g. "Asset is ASSIGNED, cannot change to X")
             const msg = statusErr.response?.data?.message || 'Status update failed';
             toast.error(msg);
             setLoading(false);
@@ -327,7 +394,6 @@ export default function AssetFormPage() {
 
   const isRental = form.ownershipType === 'RENTAL';
 
-  /* fieldProps factory — keeps JSX clean */
   const fp = (name, type = 'text') => ({
     fullWidth: true, size: 'small', type,
     value: form[name],
@@ -340,13 +406,8 @@ export default function AssetFormPage() {
 
   /* ── Render ── */
   return (
-    <Box
-      sx={{
-        maxWidth: { xs: '100%', sm: '100%', md: 1400, lg: 1600 },
-        mx: 'auto',
-        px: { xs: 1, sm: 2, md: 3 },
-      }}
-    >      <Box sx={{ maxWidth: '100%', mx: 'auto' }}>
+    <Box sx={{ maxWidth: { xs: '100%', sm: '100%', md: 1400, lg: 1600 }, mx: 'auto', px: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ maxWidth: '100%', mx: 'auto' }}>
 
         {/* ── Page Header ── */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -362,7 +423,6 @@ export default function AssetFormPage() {
           >
             Back
           </Button>
-
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={1.5}>
               <Typography sx={{ fontFamily: FONT, fontWeight: 900, fontSize: '1.4rem', color: TEXT_PRI, letterSpacing: '-0.02em' }}>
@@ -374,29 +434,20 @@ export default function AssetFormPage() {
               {isEdit ? `Updating asset · ID #${id}` : 'Register a new asset into the system'}
             </Typography>
           </Box>
-
         </Box>
 
         {/* ══════════════════════════════════════════════
             SECTION 1 — BASIC INFORMATION
         ══════════════════════════════════════════════ */}
         <Paper elevation={0} sx={sectionSx}>
-          <SectionHeader
-            icon={<InventoryIcon />}
-            title="Basic Information"
-            subtitle="Core asset identification details"
-          />
-
+          <SectionHeader icon={<InventoryIcon />} title="Basic Information" subtitle="Core asset identification details" />
           <Box sx={{ p: 2 }}>
             <Grid container spacing={2}>
 
-              {/* Row 1: Asset Name | Category */}
+              {/* Asset Name | Category */}
               <Grid item xs={12} sm={6}>
                 <FieldLabel required>Asset Name</FieldLabel>
-                <TextField
-                  placeholder="e.g. Dell Latitude Laptop"
-                  {...fp('name')}
-                />
+                <TextField placeholder="e.g. Dell Latitude Laptop" {...fp('name')} />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <FieldLabel required>Category</FieldLabel>
@@ -423,7 +474,7 @@ export default function AssetFormPage() {
                 </FormControl>
               </Grid>
 
-              {/* Row 2: Brand | Model */}
+              {/* Brand | Model */}
               <Grid item xs={12} sm={6}>
                 <FieldLabel>Brand</FieldLabel>
                 <TextField placeholder="e.g. Dell, HP, Apple" {...fp('brand')} />
@@ -433,15 +484,13 @@ export default function AssetFormPage() {
                 <TextField placeholder="e.g. Latitude5520" {...fp('model')} inputProps={{ inputMode: 'text' }} />
               </Grid>
 
-              {/* Row 3: Serial Number | Location */}
+              {/* Serial Number | Location */}
               <Grid item xs={12} sm={6}>
                 <FieldLabel>Serial Number</FieldLabel>
                 <TextField
                   placeholder="SN-ABC12345"
                   {...fp('serialNumber')}
-                  InputProps={{
-                    sx: { fontFamily: "'Roboto Mono', monospace", fontSize: '0.875rem' },
-                  }}
+                  InputProps={{ sx: { fontFamily: "'Roboto Mono', monospace", fontSize: '0.875rem' } }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -467,7 +516,7 @@ export default function AssetFormPage() {
                 </FormControl>
               </Grid>
 
-              {/* Row 4 (edit only): Status */}
+              {/* Status (edit only) */}
               {isEdit && (
                 <Grid item xs={12} sm={6}>
                   <FieldLabel>Status</FieldLabel>
@@ -490,123 +539,158 @@ export default function AssetFormPage() {
                   </FormControl>
                 </Grid>
               )}
-              {isEdit && <Grid item xs={12} sm={6} />}
-
-              {/* Notes full width */}
-              <Grid item xs={12}>
-                <FieldLabel>Notes</FieldLabel>
-                <TextField
-                  placeholder="Additional information about this asset…"
-                  {...fp('notes')}
-                  multiline rows={2}
-                />
-              </Grid>
-
-              {/* ── Add Info button ── */}
-              <Grid item xs={12}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={showAdditionalInfo ? <RemoveCircleOutlineOutlinedIcon /> : <AddCircleOutlineOutlinedIcon />}
-                  onClick={() => setShowAdditionalInfo(v => !v)}
-                  sx={{
-                    fontFamily: FONT, fontWeight: 600, textTransform: 'none',
-                    fontSize: '0.82rem', borderRadius: '10px', px: 2.5, py: 0.9,
-                    color: showAdditionalInfo ? ACCENT : BRAND,
-                    borderColor: showAdditionalInfo ? ACCENT : BRAND,
-                    backgroundColor: showAdditionalInfo ? `${ACCENT}08` : `${BRAND}06`,
-                    transition: 'all 0.18s ease',
-                    '&:hover': {
-                      backgroundColor: showAdditionalInfo ? `${ACCENT}14` : `${BRAND}12`,
-                      borderColor: showAdditionalInfo ? ACCENT : BRAND,
-                    },
-                  }}
-                >
-                  {showAdditionalInfo ? 'Remove Additional Info' : 'Add Info'}
-                </Button>
-              </Grid>
-
-              {/* ── Additional Info rich text editor ── */}
-              <Grid item xs={12}>
-                <Collapse in={showAdditionalInfo} timeout={280}>
-                  <Box
-                    sx={{
-                      border: `1.5px solid ${ACCENT}55`,
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      boxShadow: `0 2px 12px ${ACCENT}12`,
-                      backgroundColor: '#FFFBFE',
-                    }}
-                  >
-                    {/* Header */}
-                    <Box sx={{
-                      px: 2.5, py: 1.2,
-                      background: `linear-gradient(135deg, ${ACCENT}10, ${ACCENT}05)`,
-                      borderBottom: `1px solid ${ACCENT}33`,
-                      display: 'flex', alignItems: 'center', gap: 1,
-                    }}>
-                      <InfoOutlinedIcon sx={{ fontSize: 15, color: ACCENT }} />
-                      <Typography sx={{
-                        fontFamily: FONT, fontWeight: 700, fontSize: '0.75rem',
-                        color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.08em',
-                      }}>
-                        Additional Information
-                      </Typography>
-                      <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: TEXT_SEC, ml: 0.5 }}>
-                        — Rich text details for this asset
-                      </Typography>
-                    </Box>
-
-                    {/* Quill editor */}
-                    <Box sx={{
-                      '& .ql-toolbar': {
-                        borderTop: 'none',
-                        borderLeft: 'none',
-                        borderRight: 'none',
-                        borderBottom: `1px solid ${ACCENT}22`,
-                        backgroundColor: `${ACCENT}04`,
-                        fontFamily: FONT,
-                      },
-                      '& .ql-container': {
-                        border: 'none',
-                        fontFamily: FONT,
-                        fontSize: '0.875rem',
-                      },
-                      '& .ql-editor': {
-                        minHeight: '140px',
-                        maxHeight: '320px',
-                        overflowY: 'auto',
-                        fontFamily: FONT,
-                        fontSize: '0.875rem',
-                        color: TEXT_PRI,
-                        padding: '14px 16px',
-                        '&.ql-blank::before': {
-                          color: '#AAAABC',
-                          fontStyle: 'normal',
-                          fontFamily: FONT,
-                        },
-                      },
-                      '& .ql-toolbar button:hover .ql-stroke': { stroke: ACCENT },
-                      '& .ql-toolbar button.ql-active .ql-stroke': { stroke: ACCENT },
-                      '& .ql-toolbar .ql-picker-label:hover': { color: ACCENT },
-                    }}>
-                      <ReactQuill
-                        theme="snow"
-                        value={form.additionalInfo}
-                        onChange={(val) => setForm(f => ({ ...f, additionalInfo: val }))}
-                        modules={quillModules}
-                        placeholder="Enter detailed additional information about this asset (supports rich formatting)…"
-                      />
-                    </Box>
-                  </Box>
-                </Collapse>
-              </Grid>
             </Grid>
           </Box>
         </Paper>
 
         {/* ══════════════════════════════════════════════
-            SECTION 2 — OWNERSHIP TYPE
+            SECTION 2 — SPECIFICATIONS (dynamic by category)
+        ══════════════════════════════════════════════ */}
+        {form.category && (
+          <Paper elevation={0} sx={sectionSx}>
+            <SectionHeader
+              icon={<TuneIcon />}
+              title={`${form.category.replace(/_/g, ' ')} Specifications`}
+              subtitle="Category-specific technical details for this asset"
+              color="#0EA5E9"
+            />
+            <Box sx={{ p: 2 }}>
+              {specTemplateLoading ? (
+                <Box sx={{ py: 2 }}>
+                  <LinearProgress sx={{ borderRadius: 4, backgroundColor: '#E8F4FE', '& .MuiLinearProgress-bar': { backgroundColor: '#0EA5E9' } }} />
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: TEXT_SEC, mt: 1.5, textAlign: 'center' }}>
+                    Loading specification template…
+                  </Typography>
+                </Box>
+              ) : specs.length === 0 ? (
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.82rem', color: TEXT_SEC, py: 1 }}>
+                  No specification template found for this category.
+                </Typography>
+              ) : (
+                <Grid container spacing={2}>
+                  {specs.map((spec, idx) => (
+                    <Grid item xs={12} sm={6} md={4} key={spec.specKey}>
+                      <FieldLabel>{spec.specKey}</FieldLabel>
+                      <TextField
+                        fullWidth size="small"
+                        placeholder={specTemplate[spec.specKey] || `Enter ${spec.specKey}`}
+                        value={spec.specValue}
+                        onChange={e => handleSpecChange(idx, e.target.value)}
+                        sx={{
+                          fontFamily: FONT,
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '10px', fontFamily: FONT, fontSize: '0.875rem',
+                            backgroundColor: '#F0F9FF',
+                            '&:hover fieldset': { borderColor: '#0EA5E9' },
+                            '&.Mui-focused fieldset': { borderColor: '#0EA5E9', borderWidth: '2px' },
+                          },
+                          '& .MuiInputLabel-root.Mui-focused': { color: '#0EA5E9' },
+                        }}
+                      />
+                      {specTemplate[spec.specKey] && (
+                        <Typography sx={{ fontFamily: FONT, fontSize: '0.67rem', color: '#0EA5E9', mt: 0.4 }}>
+                          Hint: {specTemplate[spec.specKey]}
+                        </Typography>
+                      )}
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Box>
+          </Paper>
+        )}
+
+        {/* ══════════════════════════════════════════════
+            SECTION 3 — INVOICE UPLOAD
+        ══════════════════════════════════════════════ */}
+        <Paper elevation={0} sx={sectionSx}>
+          <SectionHeader
+            icon={<UploadFileIcon />}
+            title="Invoice / Purchase Document"
+            subtitle="Upload the invoice PDF or image for this asset (optional)"
+            color="#D97706"
+          />
+          <Box sx={{ p: 2 }}>
+            {!invoiceUrl ? (
+              <Box
+                onClick={() => invoiceInputRef.current?.click()}
+                sx={{
+                  border: `2px dashed ${invoiceUploading ? '#D97706' : BORDER}`,
+                  borderRadius: '12px',
+                  p: 3, textAlign: 'center', cursor: 'pointer',
+                  backgroundColor: invoiceUploading ? '#FFF7ED' : '#FAFBFF',
+                  transition: 'all 0.2s',
+                  '&:hover': { borderColor: '#D97706', backgroundColor: '#FFF7ED' },
+                }}
+              >
+                {invoiceUploading ? (
+                  <Box>
+                    <CircularProgress size={28} sx={{ color: '#D97706' }} />
+                    <Typography sx={{ fontFamily: FONT, fontSize: '0.82rem', color: '#D97706', mt: 1.5, fontWeight: 600 }}>
+                      Uploading invoice…
+                    </Typography>
+                    <LinearProgress sx={{ mt: 1.5, borderRadius: 4, backgroundColor: '#FEF3C7', '& .MuiLinearProgress-bar': { backgroundColor: '#D97706' } }} />
+                  </Box>
+                ) : (
+                  <>
+                    <UploadFileIcon sx={{ fontSize: 36, color: '#D97706', mb: 1 }} />
+                    <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.9rem', color: TEXT_PRI }}>
+                      Click to upload invoice
+                    </Typography>
+                    <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: TEXT_SEC, mt: 0.5 }}>
+                      Accepts PDF, JPG, PNG · Max {MAX_INVOICE_SIZE_MB}MB
+                    </Typography>
+                  </>
+                )}
+                <input
+                  ref={invoiceInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  style={{ display: 'none' }}
+                  onChange={e => handleInvoiceSelect(e.target.files?.[0])}
+                />
+              </Box>
+            ) : (
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 2,
+                border: `1.5px solid #D9770633`,
+                borderRadius: '12px', p: 2,
+                background: 'linear-gradient(135deg, #FFF7ED, #FFFDF9)',
+              }}>
+                <Box sx={{
+                  width: 44, height: 44, borderRadius: '10px', flexShrink: 0,
+                  background: 'linear-gradient(135deg, #FEF3C7, #FFF7ED)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <InsertDriveFileIcon sx={{ color: '#D97706', fontSize: 22 }} />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.88rem', color: TEXT_PRI, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {invoiceFileName || 'Invoice'}
+                  </Typography>
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: TEXT_SEC, mt: 0.3 }}>
+                    Invoice uploaded successfully
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={0.5}>
+                  <Tooltip title="View Invoice">
+                    <IconButton size="small" onClick={() => window.open(invoiceUrl, '_blank')} sx={{ color: '#D97706' }}>
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Remove Invoice">
+                    <IconButton size="small" onClick={handleRemoveInvoice} sx={{ color: '#E01950' }}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+
+        {/* ══════════════════════════════════════════════
+            SECTION 4 — OWNERSHIP TYPE
         ══════════════════════════════════════════════ */}
         <Paper elevation={0} sx={sectionSx}>
           <SectionHeader
@@ -615,9 +699,8 @@ export default function AssetFormPage() {
             subtitle="Choose how this asset is owned or acquired"
             color={isRental ? ACCENT : BRAND}
           />
-
           <Box sx={{ p: 2 }}>
-            {/* Radio toggle */}
+            {/* Toggle */}
             <Box sx={{
               display: 'inline-flex', borderRadius: '12px', border: `1.5px solid ${BORDER}`,
               overflow: 'hidden', mb: 2, backgroundColor: '#F7F8FC',
@@ -634,11 +717,9 @@ export default function AssetFormPage() {
                     fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.01em',
                     transition: 'all 0.18s ease',
                     color: form.ownershipType === opt.value ? '#fff' : TEXT_SEC,
-                    backgroundColor: form.ownershipType === opt.value
-                      ? opt.color : 'transparent',
+                    backgroundColor: form.ownershipType === opt.value ? opt.color : 'transparent',
                     '&:hover': form.ownershipType !== opt.value
-                      ? { backgroundColor: `${opt.color}10`, color: opt.color }
-                      : {},
+                      ? { backgroundColor: `${opt.color}10`, color: opt.color } : {},
                   }}
                 >
                   {opt.label}
@@ -648,41 +729,25 @@ export default function AssetFormPage() {
 
             <Divider sx={{ mb: 2, borderColor: BORDER }} />
 
-            {/* ── OWNED fields ── */}
+            {/* OWNED fields */}
             {!isRental ? (
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FieldLabel>Purchase Date</FieldLabel>
-                  <TextField
-                    type="date"
-                    {...fp('purchaseDate', 'date')}
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ max: today }}
-                  />
+                  <TextField type="date" {...fp('purchaseDate', 'date')} InputLabelProps={{ shrink: true }} inputProps={{ max: today }} />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FieldLabel>Purchase Cost (₹)</FieldLabel>
                   <TextField type="number" placeholder="0.00" {...fp('purchaseCost', 'number')} />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FieldLabel>Warranty Expiry</FieldLabel>
-                  <TextField
-                    type="date"
-                    {...fp('warrantyExpiryDate', 'date')}
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ min: today }}
-                  />
+                  <TextField type="date" {...fp('warrantyExpiryDate', 'date')} InputLabelProps={{ shrink: true }} inputProps={{ min: today }} />
                 </Grid>
-                {/* <Grid item xs={12} sm={6} md={3}>
-                  <FieldLabel>Depreciation Rate (%)</FieldLabel>
-                  <TextField type="number" placeholder="0" {...fp('depreciationRatePercent','number')} />
-                </Grid> */}
               </Grid>
-
             ) : (
-              /* ── RENTAL fields — clean 2-col layout ── */
               <>
-                {/* Sub-section: Vendor */}
+                {/* Vendor Info */}
                 <Box sx={{ mb: 2.5 }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                     <HandshakeIcon sx={{ fontSize: 16, color: ACCENT }} />
@@ -691,48 +756,29 @@ export default function AssetFormPage() {
                     </Typography>
                   </Stack>
                   <Grid container spacing={2}>
-                    {/* Row: Vendor Name | Contract Number */}
                     <Grid item xs={12} sm={6}>
                       <FieldLabel required>Vendor Name</FieldLabel>
                       <TextField placeholder="e.g. TechRent Solutions" {...fp('rentalVendorName')} />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <FieldLabel>Contract Number</FieldLabel>
-                      <TextField
-                        placeholder="CONTRACT-001"
-                        {...fp('rentalContractNumber')}
-                        InputProps={{
-                          sx: { fontFamily: "'Roboto Mono', monospace", fontSize: '0.875rem' },
-                        }}
-                      />
+                      <TextField placeholder="CONTRACT-001" {...fp('rentalContractNumber')} InputProps={{ sx: { fontFamily: "'Roboto Mono', monospace", fontSize: '0.875rem' } }} />
                     </Grid>
-
-                    {/* Row: Contact Number | Vendor Email */}
                     <Grid item xs={12} sm={6}>
                       <FieldLabel>Contact Number</FieldLabel>
                       <TextField
                         placeholder="9876543210 or +91 9876543210"
                         {...fp('rentalVendorContact')}
                         inputProps={{ inputMode: 'tel', maxLength: 15 }}
-                        InputProps={{
-                          startAdornment: (
-                            <PhoneIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} />
-                          ),
-                        }}
+                        InputProps={{ startAdornment: <PhoneIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} /> }}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <FieldLabel>Vendor Email</FieldLabel>
                       <TextField
-                        type="email"
-                        placeholder="vendor@company.com"
-                        {...fp('rentalVendorEmail')}
-                        inputProps={{ inputMode: 'email' }}
-                        InputProps={{
-                          startAdornment: (
-                            <EmailIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} />
-                          ),
-                        }}
+                        type="email" placeholder="vendor@company.com"
+                        {...fp('rentalVendorEmail')} inputProps={{ inputMode: 'email' }}
+                        InputProps={{ startAdornment: <EmailIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} /> }}
                       />
                     </Grid>
                   </Grid>
@@ -740,7 +786,7 @@ export default function AssetFormPage() {
 
                 <Divider sx={{ borderColor: BORDER, mb: 2.5 }} />
 
-                {/* Sub-section: Rental Period */}
+                {/* Rental Period & Costs */}
                 <Box sx={{ mb: 2.5 }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                     <CalendarMonthIcon sx={{ fontSize: 16, color: ACCENT }} />
@@ -749,63 +795,26 @@ export default function AssetFormPage() {
                     </Typography>
                   </Stack>
                   <Grid container spacing={2}>
-                    {/* Row: Start | End */}
-                    <Grid item xs={12} sm={6}>
+                    <Grid item xs={12} sm={6} md={3}>
                       <FieldLabel required>Rental Start Date</FieldLabel>
-                      <TextField
-                        type="date"
-                        {...fp('rentalStartDate', 'date')}
-                        InputLabelProps={{ shrink: true }}
-                        inputProps={{ max: today }}
-                      />
+                      <TextField type="date" {...fp('rentalStartDate', 'date')} InputLabelProps={{ shrink: true }} inputProps={{ max: today }} />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid item xs={12} sm={6} md={3}>
                       <FieldLabel required>Rental End Date</FieldLabel>
-                      <TextField
-                        type="date"
-                        {...fp('rentalEndDate', 'date')}
-                        InputLabelProps={{ shrink: true }}
-                        inputProps={{ min: form.rentalStartDate || today }}
-                      />
+                      <TextField type="date" {...fp('rentalEndDate', 'date')} InputLabelProps={{ shrink: true }} inputProps={{ min: form.rentalStartDate || today }} />
                     </Grid>
-
-                    {/* Row: Cost/Month | Deposit */}
-                    <Grid item xs={12} sm={6}>
+                    <Grid item xs={12} sm={6} md={3}>
                       <FieldLabel>Monthly Cost (₹)</FieldLabel>
-                      <TextField
-                        type="number" placeholder="0.00"
-                        {...fp('rentalCostPerMonth', 'number')}
-                        InputProps={{
-                          startAdornment: (
-                            <AttachMoneyIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} />
-                          ),
-                        }}
-                      />
+                      <TextField type="number" placeholder="0.00" {...fp('rentalCostPerMonth', 'number')} InputProps={{ startAdornment: <AttachMoneyIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} /> }} />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid item xs={12} sm={6} md={3}>
                       <FieldLabel>Deposit Amount (₹)</FieldLabel>
-                      <TextField
-                        type="number" placeholder="0.00"
-                        {...fp('rentalDepositAmount', 'number')}
-                        InputProps={{
-                          startAdornment: (
-                            <AttachMoneyIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} />
-                          ),
-                        }}
-                      />
+                      <TextField type="number" placeholder="0.00" {...fp('rentalDepositAmount', 'number')} InputProps={{ startAdornment: <AttachMoneyIcon sx={{ fontSize: 16, color: TEXT_SEC, mr: 0.5 }} /> }} />
                     </Grid>
-
-                    {/* Return condition — full width */}
                     <Grid item xs={12}>
                       <FieldLabel>Return Condition Notes</FieldLabel>
-                      <TextField
-                        placeholder="Describe expected return condition of the asset…"
-                        {...fp('rentalReturnCondition')}
-                        multiline rows={2}
-                      />
+                      <TextField placeholder="Describe expected return condition of the asset…" {...fp('rentalReturnCondition')} multiline rows={2} />
                     </Grid>
-
-                    {/* Renewal checkbox */}
                     <Grid item xs={12}>
                       <Box sx={{
                         display: 'inline-flex', alignItems: 'center',
@@ -813,18 +822,13 @@ export default function AssetFormPage() {
                         borderRadius: '10px', px: 2, py: 0.8,
                         backgroundColor: form.rentalRenewalOption ? `${ACCENT}08` : '#FAFBFF',
                         cursor: 'pointer', transition: 'all 0.18s',
-                      }}
-                        onClick={() => setForm(f => ({ ...f, rentalRenewalOption: !f.rentalRenewalOption }))}
-                      >
+                      }} onClick={() => setForm(f => ({ ...f, rentalRenewalOption: !f.rentalRenewalOption }))}>
                         <Checkbox
                           checked={form.rentalRenewalOption}
                           onChange={setCheck('rentalRenewalOption')}
                           onClick={e => e.stopPropagation()}
                           size="small"
-                          sx={{
-                            color: ACCENT, p: 0.5, mr: 1,
-                            '&.Mui-checked': { color: ACCENT },
-                          }}
+                          sx={{ color: ACCENT, p: 0.5, mr: 1, '&.Mui-checked': { color: ACCENT } }}
                         />
                         <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: form.rentalRenewalOption ? ACCENT : TEXT_SEC }}>
                           Renewal option available
@@ -839,10 +843,7 @@ export default function AssetFormPage() {
         </Paper>
 
         {/* ── Footer Actions ── */}
-        <Box sx={{
-          display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-          gap: 2, pt: 1, pb: 3,
-        }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, pt: 1, pb: 3 }}>
           <Button
             onClick={() => navigate('/support/asset-service')}
             sx={{
@@ -858,7 +859,7 @@ export default function AssetFormPage() {
             variant="contained"
             startIcon={loading ? <CircularProgress size={15} color="inherit" /> : <SaveIcon />}
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || invoiceUploading}
             sx={{
               fontFamily: FONT, fontWeight: 700, textTransform: 'none',
               borderRadius: '10px', px: 4, py: 1,
@@ -876,4 +877,3 @@ export default function AssetFormPage() {
     </Box>
   );
 }
-
