@@ -1053,17 +1053,32 @@ public class OurTicketServiceImpl implements OurTicketService {
 	 * ========================================================= PRIVATE: Save
 	 * attachment =========================================================
 	 */
+//	private void saveAttachment(Long ticketId, CreateTicketRequest req) {
+//		if (req.getAttachmentName() == null || req.getAttachmentName().isBlank()) {
+//			return;
+//		}
+//		TicketAttachments a = new TicketAttachments();
+//		a.setTicketId(ticketId);
+//		a.setFilename(req.getAttachmentName());
+//		a.setFile(req.getAttachmentName());
+//		attachmentRepo.save(a);
+//	}
 	private void saveAttachment(Long ticketId, CreateTicketRequest req) {
-		if (req.getAttachmentName() == null || req.getAttachmentName().isBlank()) {
-			return;
-		}
-		TicketAttachments a = new TicketAttachments();
-		a.setTicketId(ticketId);
-		a.setFilename(req.getAttachmentName());
-		a.setFile(req.getAttachmentName());
-		attachmentRepo.save(a);
+	    if (req.getAttachmentName() == null || req.getAttachmentName().isBlank()) {
+	        return;
+	    }
+	    if (req.getAttachmentBase64() == null || req.getAttachmentBase64().isBlank()) {
+	        return;
+	    }
+	    TicketAttachments a = new TicketAttachments();
+	    a.setTicketId(ticketId);
+	    a.setFilename(req.getAttachmentName());
+	    a.setFile(req.getAttachmentBase64());
+	    a.setMimeType(req.getAttachmentMimeType());
+	    a.setFileSizeBytes(req.getAttachmentSizeBytes());
+	    attachmentRepo.save(a);
 	}
-   
+	 
     private void saveAccessPeriod(Long ticketId, CreateTicketRequest req) {
     if (req.getAccessRequiredTill() == null) {
         return;

@@ -1,43 +1,40 @@
 package com.relevantz.ticketservice.controller;
-
+ 
 import java.util.List;
-
-import org.apache.hc.core5.http.HttpStatus;
+ 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.relevantz.ticketservice.model.TicketAttachments;
+ 
+import com.relevantz.ticketservice.dto.AttachmentResponse;
 import com.relevantz.ticketservice.repository.TicketAttachmentRepository;
-
+ 
 @RestController
 @RequestMapping("/api/attachments")
 public class AttachmentController {
-
+ 
     private final TicketAttachmentRepository attachmentRepository;
-
+ 
     public AttachmentController(TicketAttachmentRepository repo) {
         this.attachmentRepository = repo;
     }
-
+ 
+    // GET /api/attachments/ticket/{ticketId}
+    // Frontend renders: <img src={`data:${a.mimeType};base64,${a.file}`} />
     @GetMapping("/ticket/{ticketId}")
-    public ResponseEntity<List<TicketAttachments>> getAttachments(
+    public ResponseEntity<List<AttachmentResponse>> getAttachments(
             @PathVariable Long ticketId) {
-
-        return ResponseEntity.ok(
-                attachmentRepository.findByTicketId(ticketId)
-        );
-    }
-
-    @PostMapping
-    public ResponseEntity<TicketAttachments> upload(
-            @RequestBody TicketAttachments attachment) {
-
-        return ResponseEntity.status(HttpStatus.SC_CREATED)
-                .body(attachmentRepository.save(attachment));
+ 
+        List<AttachmentResponse> result = attachmentRepository
+                .findByTicketId(ticketId)
+                .stream()
+                .map(AttachmentResponse::from)
+                .toList();
+ 
+        return ResponseEntity.ok(result);
     }
 }
+ 
