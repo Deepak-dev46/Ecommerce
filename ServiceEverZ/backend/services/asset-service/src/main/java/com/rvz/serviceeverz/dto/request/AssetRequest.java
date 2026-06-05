@@ -1,10 +1,13 @@
 package com.rvz.serviceeverz.dto.request;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.rvz.serviceeverz.enums.AssetCategory;
 import com.rvz.serviceeverz.enums.AssetOwnershipType;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -27,10 +30,65 @@ public class AssetRequest {
 	private Double depreciationRatePercent;
 
 	// RENTAL
-	private String rentalVendorName, rentalVendorContact, rentalContractNumber, rentalReturnCondition;
+	private String rentalVendorName, rentalVendorContact, rentalVendorEmail, rentalContractNumber,
+			rentalReturnCondition;
 	private LocalDate rentalStartDate, rentalEndDate;
 	private Double rentalCostPerMonth, rentalDepositAmount;
 	private Boolean rentalRenewalOption;
+
+	// ── Invoice ────────────────────────────────────────────────────────────────
+	/**
+	 * Base64-encoded file content sent from the browser (replaces file-server URL).
+	 */
+	private String invoiceData;
+	/** MIME type of the file, e.g. "application/pdf". */
+	private String invoiceContentType;
+	/** Original file name for display in the UI. */
+	private String invoiceFileName;
+
+	public String getInvoiceData() {
+		return invoiceData;
+	}
+
+	public void setInvoiceData(String invoiceData) {
+		this.invoiceData = invoiceData;
+	}
+
+	public String getInvoiceContentType() {
+		return invoiceContentType;
+	}
+
+	public void setInvoiceContentType(String invoiceContentType) {
+		this.invoiceContentType = invoiceContentType;
+	}
+
+	public String getInvoiceFileName() {
+		return invoiceFileName;
+	}
+
+	public void setInvoiceFileName(String invoiceFileName) {
+		this.invoiceFileName = invoiceFileName;
+	}
+
+	// ── NEW: Category-specific specifications ─────────────────────
+	@Valid
+	private List<AssetSpecificationRequest> specifications = new ArrayList<>();
+
+	public String getRentalVendorEmail() {
+		return rentalVendorEmail;
+	}
+
+	public void setRentalVendorEmail(String v) {
+		rentalVendorEmail = v;
+	}
+
+	public List<AssetSpecificationRequest> getSpecifications() {
+		return specifications;
+	}
+
+	public void setSpecifications(List<AssetSpecificationRequest> specifications) {
+		this.specifications = specifications;
+	}
 
 	public String getName() {
 		return name;
@@ -207,4 +265,5 @@ public class AssetRequest {
 	public void setRentalReturnCondition(String v) {
 		rentalReturnCondition = v;
 	}
+
 }

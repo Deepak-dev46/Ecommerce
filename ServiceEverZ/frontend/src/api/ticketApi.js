@@ -86,7 +86,7 @@ export const pauseTicket = (id) => {
 //   });
 export const resumeTicket = (id) => {
   const payload = {
-    status: "IN_PROGRESS",
+    status: "OPEN",
     resolutionNotes: "Resumed",
     changedById: 1,
     changedBy: "Support Agent"

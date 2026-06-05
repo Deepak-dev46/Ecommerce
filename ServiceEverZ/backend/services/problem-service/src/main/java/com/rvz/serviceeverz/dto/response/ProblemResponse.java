@@ -37,6 +37,9 @@ public class ProblemResponse {
 	private LocalDateTime updatedAt;
 	private List<LinkedIncidentDto> linkedIncidents;
 
+	/** All file attachments grouped across all sections (SOLUTION, ROOT_CAUSE, WORKAROUND, PERMANENT_FIX) */
+	private List<ProblemAttachmentResponse> attachments;
+
 	public static class LinkedIncidentDto {
 		private Long linkId;
 		private Long incidentId;
@@ -291,5 +294,13 @@ public class ProblemResponse {
 
 	public void setLinkedIncidents(List<LinkedIncidentDto> linkedIncidents) {
 		this.linkedIncidents = linkedIncidents;
+	}
+
+	public List<ProblemAttachmentResponse> getAttachments() {
+		return attachments;
+	}
+
+	public void setAttachments(List<ProblemAttachmentResponse> attachments) {
+		this.attachments = attachments;
 	}
 }

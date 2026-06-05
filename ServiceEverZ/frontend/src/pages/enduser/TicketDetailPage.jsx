@@ -312,7 +312,7 @@ function WorklogStatusBadge({ status }) {
 /* ─── HistoryRow (updated — matches reference image layout) ─── */
 /**
  * Props
- *   event  : one DB history record  { history_id, changedBy, changedByName?,
+ *   event  : one DB history record  { history_id, changedBy, createdByName?,
  *                                      changedAt, remarks, status, ticket_id }
  *   isLast : boolean — suppresses the downward connector line on the last item
  */
@@ -322,18 +322,18 @@ function HistoryRow({ event, isLast }) {
   console.log(event);
 
 
-  const isSystem = event.changedByName == 'System';
+  const isSystem = event.createdByName == 'System';
 
-  const agentName = event.changedByName
-    ? event.changedByName
+  const agentName = event.createdByName
+    ? event.createdByName
     : isSystem
       ? "System"
       : `User #${event.changedBy}`;
 
   const initials = isSystem
     ? "SM"
-    : event.changedByName
-      ? event.changedByName
+    : event.createdByName
+      ? event.createdByName
         .split(" ")
         .map((word) => word[0])
         .join("")
@@ -391,7 +391,7 @@ function HistoryRow({ event, isLast }) {
             background:
               isSystem
                 ? "linear-gradient(135deg,#9CA3AF,#6B7280)"
-                : "linear-gradient(135deg,#27235C,#524F7D)",
+                : "linear-gradient(135deg, #97247E 0%, #C45AA8 100%)",
           }}
         >
           {initials}
@@ -1111,7 +1111,7 @@ function ApprovalsTab({ ticket }) {
  * DB fields used:
  *   history_id   → React key (stable)
  *   changedBy   → avatar fallback / isSystem guard
- *   changedByName→ agent display name (optional JOIN from backend)
+ *   createdByName→ agent display name (optional JOIN from backend)
  *   changedAt   → sort, group, time display
  *   remarks      → content text inside card
  *   status       → WorklogStatusBadge

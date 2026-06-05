@@ -10,7 +10,7 @@ export const problemApi = axios.create({
 });
 
 const attach = (config) => {
-  const t = tokenUtils.getToken()();
+  const t = tokenUtils.getToken();
   if (t) config.headers.Authorization = `Bearer ${t}`;
   return config;
 };
@@ -128,3 +128,62 @@ export const updateSubCategory = (subCatId, body) =>
 /** Deactivate a sub-category */
 export const deactivateSubCategory = (subCatId) =>
   problemApi.delete(`/api/problem-categories/sub-categories/${subCatId}`);
+
+// ── Attachment Endpoints ───────────────────────────────────────────────────────
+
+/**
+ * Upload a file attachment to a problem section.
+ * @param {number} problemId
+ * @param {File}   file           - the File object from an <input type="file">
+ * @param {string} section        - 'SOLUTION' | 'ROOT_CAUSE' | 'WORKAROUND' | 'PERMANENT_FIX'
+ * @param {number} uploadedBySpId
+ */
+export const uploadProblemAttachment = (problemId, file, section, uploadedBySpId) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('section', section);
+  formData.append('uploadedBySpId', uploadedBySpId);
+  return problemApi.post(`/api/problems/${problemId}/attachments`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+/**
+ * List all attachments for a problem.
+ * @param {number} problemId
+ * @param {string|null} section - optional filter e.g. 'ROOT_CAUSE'
+ */
+export const getProblemAttachments = (problemId, section = null) =>
+  problemApi.get(`/api/problems/${problemId}/attachments`, {
+    params: section ? { section } : {},
+  });
+
+/**
+ * Delete an attachment (record + physical file).
+ * @param {number} problemId
+ * @param {number} attachmentId
+ */
+export const deleteProblemAttachment = (problemId, attachmentId) =>
+  problemApi.delete(`/api/problems/${problemId}/attachments/${attachmentId}`);
+
+/**
+ * Build the streaming download URL for an attachment.
+ * Use this directly as <img src>, <iframe src>, or window.open().
+ * Auth header is NOT sent for this URL — it's a direct browser fetch.
+ * If your backend requires auth on the download endpoint, use downloadProblemAttachment() instead.
+ * @param {number} problemId
+ * @param {number} attachmentId
+ */
+export const getProblemAttachmentDownloadUrl = (problemId, attachmentId) =>
+  `${problemApi.defaults.baseURL}/api/problems/${problemId}/attachments/${attachmentId}/download`;
+
+/**
+ * Download an attachment as a Blob (carries the auth token).
+ * Use this if the download endpoint is protected and the browser src trick won't work.
+ * @param {number} problemId
+ * @param {number} attachmentId
+ */
+export const downloadProblemAttachment = (problemId, attachmentId) =>
+  problemApi.get(`/api/problems/${problemId}/attachments/${attachmentId}/download`, {
+    responseType: 'blob',
+  });

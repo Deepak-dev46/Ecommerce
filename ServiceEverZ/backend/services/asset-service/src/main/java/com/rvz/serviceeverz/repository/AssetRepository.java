@@ -1,6 +1,7 @@
 package com.rvz.serviceeverz.repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -72,4 +73,22 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
 	List<Asset> searchAvailableByKeywordAndCategory(@Param("kw") String kw, @Param("category") AssetCategory category);
 
 	List<Asset> findAllByCategoryAndStatusAndIsDeletedFalse(AssetCategory category, AssetStatus status);
+	 @Query("""
+		        SELECT a FROM Asset a
+		        WHERE a.isDeleted = false
+		          AND a.status = 'AVAILABLE'
+		          AND a.id IN :assetIds
+		          AND (:keyword IS NULL OR
+		               LOWER(a.name)         LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+		               LOWER(a.brand)        LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+		               LOWER(a.model)        LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+		               LOWER(a.assetTag)     LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+		               LOWER(a.serialNumber) LIKE LOWER(CONCAT('%',:keyword,'%')))
+		          AND (:category IS NULL OR a.category = :category)
+		        ORDER BY a.createdAt DESC
+		        """)
+		    List<Asset> searchAvailableBySpecIds(
+		        @Param("assetIds")  Collection<Long> assetIds,
+		        @Param("keyword")   String keyword,
+		        @Param("category")  AssetCategory category);
 }

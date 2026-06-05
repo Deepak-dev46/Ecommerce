@@ -110,7 +110,7 @@ const SUPPORT_NAV = [
 const APPROVAL_NAV = [
   { label: 'Approval queue', icon: AssignmentTurnedInIcon, path: '/approvals/queue', featureKey: 'L1_QUEUE' },
   { label: 'History', icon: HistoryIcon, path: '/approvals/history', featureKey: 'L1_HISTORY' },
-  { label: 'Create ticket', icon: CreateIcon, path: '/approvals/service-catalog', featureKey: 'L1_CATALOG' },
+
 ];
 
 const RESOURCE_OWNER_NAV = [
