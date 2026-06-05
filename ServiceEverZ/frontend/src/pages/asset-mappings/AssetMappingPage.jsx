@@ -206,7 +206,7 @@ export default function AssetMappingPage() {
         (m.assetTag        || '').toLowerCase().includes(q) ||
         (m.assetCategory   || '').toLowerCase().includes(q) ||
         String(m.ticketId  || '').toLowerCase().includes(q) ||
-        (m.requestedByUserName || String(m.requestedByUserId || '')).toLowerCase().includes(q) ||
+        (m.requestedByUserName || '').toLowerCase().includes(q) ||
         (m.assignedBySpName    || '').toLowerCase().includes(q)
       );
     });
@@ -498,7 +498,7 @@ export default function AssetMappingPage() {
                   </TableCell>
                   <TableCell><CategoryChip category={m.assetCategory} /></TableCell>
                   <TableCell sx={{ fontSize: '0.82rem', fontFamily: FONT }}>{m.ticketId}</TableCell>
-                  <TableCell sx={{ fontSize: '0.82rem', fontFamily: FONT }}>{m.requestedByUserName || m.requestedByUserId}</TableCell>
+                  <TableCell sx={{ fontSize: '0.82rem', fontFamily: FONT }}>{m.requestedByUserName || '—'}</TableCell>
                   <TableCell sx={{ fontSize: '0.82rem', fontFamily: FONT }}>{m.assignedBySpName || '—'}</TableCell>
                   <TableCell sx={{ fontSize: '0.82rem', fontFamily: FONT }}>{m.approvedByManagerName || '—'}</TableCell>
                   <TableCell><MappingStatusChip status={m.status} /></TableCell>

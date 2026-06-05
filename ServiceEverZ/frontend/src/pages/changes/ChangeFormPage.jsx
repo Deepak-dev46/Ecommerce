@@ -7,8 +7,6 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 // ── Format Icons ──────────────────────────────────────────────────────────────
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
@@ -32,7 +30,7 @@ import toast from '../../utils/toast';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CHANGE_TYPES = ['STANDARD', 'NORMAL', 'EMERGENCY'];
-const PRIORITIES   = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 const PRIORITY_COLORS = {
   LOW:      { dot: '#10B981' },
@@ -63,40 +61,49 @@ const EMPTY = {
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
     borderRadius: '8px',
-    backgroundColor: '#F8FAFF',
+    backgroundColor: '#fff',
     fontSize: '0.85rem',
     height: 42,
     '&:hover fieldset':        { borderColor: '#27235C' },
     '&.Mui-focused fieldset':  { borderColor: '#27235C', borderWidth: '2px' },
-    '&.Mui-focused':           { backgroundColor: '#fff' },
     '&.Mui-error fieldset':    { borderColor: '#E01950' },
   },
-  '& .MuiInputLabel-root':              { fontSize: '0.82rem' },
-  '& .MuiInputLabel-root.Mui-focused':  { color: '#27235C' },
-  '& .MuiFormHelperText-root':          { fontSize: '0.7rem', mt: 0.3, mb: 0 },
+  '& .MuiInputLabel-root':           { fontSize: '0.82rem' },
+  '& .MuiInputLabel-root.Mui-focused': { color: '#27235C' },
+  '& .MuiFormHelperText-root':       { fontSize: '0.7rem', mt: 0.3, mb: 0 },
 };
 
 const selectSx = {
   '& .MuiOutlinedInput-root': {
     borderRadius: '8px',
-    backgroundColor: '#F8FAFF',
+    backgroundColor: '#fff',
     fontSize: '0.85rem',
     height: 42,
-    '&:hover fieldset':       { borderColor: '#27235C' },
-    '&.Mui-focused fieldset': { borderColor: '#27235C', borderWidth: '2px' },
-    '&.Mui-focused':          { backgroundColor: '#fff' },
-    '&.Mui-error fieldset':   { borderColor: '#E01950' },
+    '&:hover fieldset':        { borderColor: '#27235C' },
+    '&.Mui-focused fieldset':  { borderColor: '#27235C', borderWidth: '2px' },
+    '&.Mui-error fieldset':    { borderColor: '#E01950' },
   },
   '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1, py: 0 },
-  '& .MuiInputLabel-root':             { fontSize: '0.82rem' },
+  '& .MuiInputLabel-root':           { fontSize: '0.82rem' },
   '& .MuiInputLabel-root.Mui-focused': { color: '#27235C' },
-  '& .MuiFormHelperText-root':         { fontSize: '0.7rem', mt: 0.3, mb: 0 },
+  '& .MuiFormHelperText-root':       { fontSize: '0.7rem', mt: 0.3, mb: 0 },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+/** Uppercase label matching image style: "TITLE *", "CATEGORY *" */
 function SectionLabel({ children, required }) {
   return (
-    <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151', mb: 0.75, letterSpacing: '0.01em' }}>
+    <Typography
+      sx={{
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        color: '#374151',
+        mb: 0.75,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+      }}
+    >
       {children}
       {required && <Box component="span" sx={{ color: '#E01950', ml: 0.3 }}>*</Box>}
     </Typography>
@@ -104,35 +111,52 @@ function SectionLabel({ children, required }) {
 }
 
 function Dot({ color }) {
-  return <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />;
+  return (
+    <Box
+      sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }}
+    />
+  );
 }
 
-function SectionHeader({ label }) {
+/** Inline section divider label — matches "DESCRIPTION *" style in image */
+function InlineSectionLabel({ children, required }) {
   return (
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5 }}>
-      <Box sx={{ width: 3, height: 16, borderRadius: '2px', background: 'linear-gradient(180deg,#27235C,#97247E)' }} />
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#27235C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-        {label}
+    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+      <Box
+        sx={{
+          width: 3, height: 14, borderRadius: '2px',
+          background: 'linear-gradient(180deg,#27235C,#97247E)',
+        }}
+      />
+      <Typography
+        sx={{
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          color: '#97247E',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {children}
+        {required && <Box component="span" sx={{ color: '#E01950', ml: 0.3 }}>*</Box>}
       </Typography>
     </Stack>
   );
 }
 
-// ─── Rich Text Editor — matches sample image toolbar exactly ─────────────────
+// ─── Rich Text Editor ─────────────────────────────────────────────────────────
 function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Brief description...' }) {
-  const editorRef       = useRef(null);
-  const skipNextSync    = useRef(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const [fontFamily, setFontFamily] = useState('Sans Serif');
-  const [fontSize,   setFontSize]   = useState('Normal');
+  const editorRef     = useRef(null);
+  const skipNextSync  = useRef(false);
+  const [isFocused,   setIsFocused]   = useState(false);
+  const [fontFamily,  setFontFamily]  = useState('Sans Serif');
+  const [fontSize,    setFontSize]    = useState('Normal');
 
-  // Mount: set initial HTML once
   useEffect(() => {
     if (editorRef.current) editorRef.current.innerHTML = value || '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync external value (edit-fetch)
   useEffect(() => {
     if (!editorRef.current) return;
     if (skipNextSync.current) { skipNextSync.current = false; return; }
@@ -173,42 +197,29 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
     exec('fontSize', { Small: '2', Normal: '3', Large: '4', Huge: '5' }[v] || '3');
   };
 
-  // Styles
   const borderColor = error ? '#E01950' : isFocused ? '#27235C' : '#D1D5DB';
   const borderWidth = isFocused || error ? 2 : 1;
   const boxShadow   = isFocused
     ? `0 0 0 3px ${error ? alpha('#E01950', 0.08) : alpha('#27235C', 0.06)}`
     : 'none';
 
-  // Toolbar icon button style
   const iconBtnSx = {
-    width: 28,
-    height: 28,
-    borderRadius: '5px',
-    border: '1px solid #E0E0E8',
-    backgroundColor: '#fff',
-    color: '#374151',
-    p: 0,
-    flexShrink: 0,
+    width: 28, height: 28, borderRadius: '5px',
+    border: '1px solid #E0E0E8', backgroundColor: '#fff',
+    color: '#374151', p: 0, flexShrink: 0,
     '&:hover': { backgroundColor: '#F0F1FA', borderColor: '#B0B4CC', color: '#27235C' },
     '&:active': { transform: 'scale(0.95)' },
   };
 
-  // Toolbar dropdown style
   const dropdownSx = {
-    height: 28,
-    fontSize: '0.76rem',
-    fontWeight: 500,
-    color: '#374151',
-    backgroundColor: '#fff',
-    border: '1px solid #E0E0E8',
-    borderRadius: '5px',
+    height: 28, fontSize: '0.76rem', fontWeight: 500,
+    color: '#374151', backgroundColor: '#fff',
+    border: '1px solid #E0E0E8', borderRadius: '5px',
     '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
     '&:hover': { backgroundColor: '#F0F1FA' },
     '& .MuiSelect-select': { py: 0, px: '8px', display: 'flex', alignItems: 'center' },
   };
 
-  // Vertical divider between toolbar groups
   const Vr = () => (
     <Box sx={{ width: '1px', height: 18, backgroundColor: '#E0E0E8', mx: 0.25, flexShrink: 0 }} />
   );
@@ -227,38 +238,29 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
           backgroundColor: '#fff',
         }}
       >
-        {/* ── Toolbar ────────────────────────────────────────────────────── */}
+        {/* Toolbar */}
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '4px',
-            px: 1.5,
-            py: '6px',
-            borderBottom: '1px solid #E8E8F0',
-            backgroundColor: '#FAFAFA',
+            display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+            gap: '4px', px: 1.5, py: '6px',
+            borderBottom: '1px solid #E8E8F0', backgroundColor: '#FAFAFA',
           }}
         >
-          {/* Group 1: B I U S */}
           <Tooltip title="Bold" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('bold'); }}>
-              <FormatBoldIcon sx={{ fontSize: '0.95rem', fontWeight: 900 }} />
+              <FormatBoldIcon sx={{ fontSize: '0.95rem' }} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Italic" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('italic'); }}>
               <FormatItalicIcon sx={{ fontSize: '0.95rem' }} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Underline" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('underline'); }}>
               <FormatUnderlinedIcon sx={{ fontSize: '0.95rem' }} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Strikethrough" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('strikeThrough'); }}>
               <StrikethroughSIcon sx={{ fontSize: '0.95rem' }} />
@@ -267,59 +269,32 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
 
           <Vr />
 
-          {/* Group 2: Font Family + Font Size dropdowns */}
-          <Select
-            value={fontFamily}
-            onChange={handleFontFamily}
-            size="small"
-            sx={{ ...dropdownSx, minWidth: 108 }}
-            MenuProps={{ PaperProps: { sx: { fontSize: '0.78rem' } } }}
-          >
-            {FONT_FAMILIES.map(f => (
-              <MenuItem key={f} value={f} sx={{ fontSize: '0.78rem' }}>{f}</MenuItem>
-            ))}
+          <Select value={fontFamily} onChange={handleFontFamily} size="small" sx={{ ...dropdownSx, minWidth: 108 }}>
+            {FONT_FAMILIES.map(f => <MenuItem key={f} value={f} sx={{ fontSize: '0.78rem' }}>{f}</MenuItem>)}
           </Select>
-
-          <Select
-            value={fontSize}
-            onChange={handleFontSize}
-            size="small"
-            sx={{ ...dropdownSx, minWidth: 84 }}
-            MenuProps={{ PaperProps: { sx: { fontSize: '0.78rem' } } }}
-          >
-            {FONT_SIZES.map(s => (
-              <MenuItem key={s} value={s} sx={{ fontSize: '0.78rem' }}>{s}</MenuItem>
-            ))}
+          <Select value={fontSize} onChange={handleFontSize} size="small" sx={{ ...dropdownSx, minWidth: 84 }}>
+            {FONT_SIZES.map(s => <MenuItem key={s} value={s} sx={{ fontSize: '0.78rem' }}>{s}</MenuItem>)}
           </Select>
 
           <Vr />
 
-          {/* Group 3: Text Color + Highlight (A + highlight icon) */}
           <Tooltip title="Text Color" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} component="label">
               <FormatColorTextIcon sx={{ fontSize: '0.95rem' }} />
-              <input
-                type="color"
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                onChange={e => exec('foreColor', e.target.value)}
-              />
+              <input type="color" style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                onChange={e => exec('foreColor', e.target.value)} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Highlight" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} component="label">
               <BorderColorIcon sx={{ fontSize: '0.95rem' }} />
-              <input
-                type="color"
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                onChange={e => exec('hiliteColor', e.target.value)}
-              />
+              <input type="color" style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                onChange={e => exec('hiliteColor', e.target.value)} />
             </IconButton>
           </Tooltip>
 
           <Vr />
 
-          {/* Group 4: Alignment (just left shown; expand as needed) */}
           <Tooltip title="Align Left" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('justifyLeft'); }}>
               <FormatAlignLeftIcon sx={{ fontSize: '0.95rem' }} />
@@ -328,13 +303,11 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
 
           <Vr />
 
-          {/* Group 5: Ordered + Unordered lists */}
           <Tooltip title="Numbered List" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('insertOrderedList'); }}>
               <FormatListNumberedIcon sx={{ fontSize: '0.95rem' }} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Bullet List" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList'); }}>
               <FormatListBulletedIcon sx={{ fontSize: '0.95rem' }} />
@@ -343,13 +316,11 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
 
           <Vr />
 
-          {/* Group 6: Indent / Outdent */}
           <Tooltip title="Decrease Indent" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('outdent'); }}>
               <FormatIndentDecreaseIcon sx={{ fontSize: '0.95rem' }} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Increase Indent" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('indent'); }}>
               <FormatIndentIncreaseIcon sx={{ fontSize: '0.95rem' }} />
@@ -358,21 +329,15 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
 
           <Vr />
 
-          {/* Group 7: Link + Clear Format */}
           <Tooltip title="Insert Link" placement="top" arrow>
-            <IconButton
-              size="small"
-              sx={iconBtnSx}
-              onMouseDown={e => {
-                e.preventDefault();
-                const url = window.prompt('Enter URL:');
-                if (url) exec('createLink', url);
-              }}
-            >
+            <IconButton size="small" sx={iconBtnSx} onMouseDown={e => {
+              e.preventDefault();
+              const url = window.prompt('Enter URL:');
+              if (url) exec('createLink', url);
+            }}>
               <InsertLinkIcon sx={{ fontSize: '0.95rem' }} />
             </IconButton>
           </Tooltip>
-
           <Tooltip title="Clear Formatting" placement="top" arrow>
             <IconButton size="small" sx={iconBtnSx} onMouseDown={e => { e.preventDefault(); exec('removeFormat'); }}>
               <FormatClearIcon sx={{ fontSize: '0.95rem' }} />
@@ -380,9 +345,8 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
           </Tooltip>
         </Box>
 
-        {/* ── Content area ─────────────────────────────────────────────── */}
+        {/* Content area */}
         <Box sx={{ position: 'relative', backgroundColor: '#fff' }}>
-          {/* Placeholder */}
           {isEmpty && !isFocused && (
             <Box
               sx={{
@@ -397,7 +361,6 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
               {placeholder}
             </Box>
           )}
-
           <Box
             ref={editorRef}
             contentEditable
@@ -406,48 +369,24 @@ function RichTextEditor({ value, onChange, error, helperText, placeholder = 'Bri
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             sx={{
-              minHeight: 140,
-              maxHeight: 260,
-              overflowY: 'auto',
-              p: '12px 14px',
-              outline: 'none',
-              fontSize: '0.83rem',
-              lineHeight: 1.7,
+              minHeight: 140, maxHeight: 260, overflowY: 'auto',
+              p: '12px 14px', outline: 'none',
+              fontSize: '0.83rem', lineHeight: 1.7,
               color: '#1A1A1A',
               fontFamily: '"IBM Plex Sans","Roboto",sans-serif',
-              position: 'relative',
-              zIndex: 2,
-              '& blockquote': {
-                borderLeft: '3px solid #27235C',
-                margin: '6px 0',
-                paddingLeft: '10px',
-                color: '#6B7280',
-                fontStyle: 'italic',
-              },
-              '& pre': {
-                backgroundColor: '#F3F4F6',
-                borderRadius: '5px',
-                padding: '6px 10px',
-                fontFamily: '"Courier New",Courier,monospace',
-                fontSize: '0.75rem',
-                overflowX: 'auto',
-              },
+              position: 'relative', zIndex: 2,
               '& ul, & ol': { paddingLeft: '20px', margin: '3px 0' },
               '& a': { color: '#27235C', textDecoration: 'underline' },
             }}
           />
         </Box>
 
-        {/* ── Bottom resize bar ─────────────────────────────────────────── */}
+        {/* Resize bar */}
         <Box
           sx={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-            px: 1,
-            py: '3px',
-            borderTop: '1px solid #F0F2F8',
-            backgroundColor: '#FAFAFA',
+            display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+            px: 1, py: '3px',
+            borderTop: '1px solid #F0F2F8', backgroundColor: '#FAFAFA',
           }}
         >
           <Box sx={{ display: 'flex', gap: '3px', alignItems: 'center', mr: 0.5 }}>
@@ -492,8 +431,8 @@ export default function ChangeFormPage() {
           description:      c.description      ?? '',
           changeType:       c.changeType        ?? 'NORMAL',
           priority:         c.priority          ?? 'MEDIUM',
-          plannedStartTime: c.plannedStartTime  ? c.plannedStartTime.substring(0, 16) : '',
-          plannedEndTime:   c.plannedEndTime    ? c.plannedEndTime.substring(0, 16)   : '',
+          plannedStartTime: c.plannedStartTime ? c.plannedStartTime.substring(0, 16) : '',
+          plannedEndTime:   c.plannedEndTime   ? c.plannedEndTime.substring(0, 16)   : '',
         });
       })
       .catch(() => toast.error('Failed to load change plan'))
@@ -507,11 +446,11 @@ export default function ChangeFormPage() {
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim())       e.title            = 'Title is required';
-    if (!form.changeType)         e.changeType        = 'Change type is required';
-    if (!form.priority)           e.priority          = 'Priority is required';
-    if (!form.plannedStartTime)   e.plannedStartTime  = 'Start time is required';
-    if (!form.plannedEndTime)     e.plannedEndTime    = 'End time is required';
+    if (!form.title.trim())        e.title            = 'Title is required';
+    if (!form.changeType)          e.changeType       = 'Change type is required';
+    if (!form.priority)            e.priority         = 'Priority is required';
+    if (!form.plannedStartTime)    e.plannedStartTime = 'Start time is required';
+    if (!form.plannedEndTime)      e.plannedEndTime   = 'End time is required';
     if (
       form.plannedStartTime && form.plannedEndTime &&
       form.plannedEndTime <= form.plannedStartTime
@@ -554,103 +493,93 @@ export default function ChangeFormPage() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, width: '100%', maxWidth: 900, mx: 'auto', boxSizing: 'border-box' }}>
+    // ── Outer wrapper: matches app-shell padding (px:3, pt:3) ──────────────────
+    <Box sx={{ p: 3, width: '100%', boxSizing: 'border-box' }}>
 
-      {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <Box sx={{ mb: 3 }}>
+      {/* ── Page Header ─────────────────────────────────────────────────────── */}
+      <Stack direction="row" alignItems="flex-start" spacing={2} sx={{ mb: 3 }}>
+
+        {/* Back button — same pill style as image */}
         <Button
           startIcon={<ArrowBackIcon sx={{ fontSize: 15 }} />}
           onClick={() => navigate('/support/changeplan')}
           size="small"
+          variant="outlined"
           sx={{
-            color: '#9CA3AF', mb: 1.5, pl: 0, fontSize: '0.78rem', textTransform: 'none',
-            '&:hover': { backgroundColor: 'transparent', color: '#27235C' },
+            borderColor: '#E5E7EB',
+            color: '#374151',
+            fontWeight: 600,
+            fontSize: '0.78rem',
+            textTransform: 'none',
+            borderRadius: '8px',
+            height: 36,
+            px: 1.75,
+            flexShrink: 0,
+            mt: '2px',
+            '&:hover': { borderColor: '#27235C', color: '#27235C', backgroundColor: 'transparent' },
           }}
         >
-          Back to Changes
+          Back
         </Button>
 
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Box
-              sx={{
-                width: 42, height: 42, borderRadius: '11px',
-                background: 'linear-gradient(135deg,#27235C 0%,#97247E 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 3px 10px rgba(39,35,92,0.25)', flexShrink: 0,
-              }}
-            >
-              <AssignmentIcon sx={{ color: '#fff', fontSize: 20 }} />
-            </Box>
-            <Box>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography sx={{ fontWeight: 800, color: '#27235C', fontSize: '1.08rem', lineHeight: 1.2 }}>
-                  {isEdit ? 'Edit Change Plan' : 'New Change Plan'}
-                </Typography>
-                {!isEdit && (
-                  <Chip
-                    icon={<AutoAwesomeIcon sx={{ fontSize: '0.65rem !important' }} />}
-                    label="New"
-                    size="small"
-                    sx={{
-                      height: 18, fontSize: '0.6rem', fontWeight: 700,
-                      background: 'linear-gradient(135deg,#27235C,#97247E)',
-                      color: '#fff', '& .MuiChip-icon': { color: '#fff' },
-                    }}
-                  />
-                )}
-              </Stack>
-              <Typography sx={{ color: '#B0B7C3', fontSize: '0.72rem', mt: 0.2 }}>
-                {isEdit ? 'Update change request details' : 'Fill all required fields to submit for approval'}
-              </Typography>
-            </Box>
-          </Stack>
+        {/* Title + subtitle */}
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h2" sx={{ fontWeight: 700, color: '#27235C', lineHeight: 1.2 }}>
+            {isEdit ? 'Edit Change Plan' : 'New Change Plan'}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.25 }}>
+            {isEdit
+              ? 'Update the details of this change request'
+              : 'Fill in the required fields to submit a new change request for approval'}
+          </Typography>
+        </Box>
 
-          {/* Save button in header */}
-          <Button
-            variant="contained"
-            startIcon={loading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 16 }} />}
-            onClick={handleSubmit}
-            disabled={loading}
-            sx={{
-              background: 'linear-gradient(135deg,#27235C,#97247E)',
-              borderRadius: '8px',
-              fontWeight: 700,
-              fontSize: '0.82rem',
-              textTransform: 'none',
-              px: 2.5,
-              height: 38,
-              boxShadow: '0 3px 10px rgba(39,35,92,0.22)',
-              '&:hover': { background: 'linear-gradient(135deg,#1e1a47,#7a1c65)', boxShadow: '0 4px 14px rgba(39,35,92,0.32)' },
-              '&.Mui-disabled': { background: '#D1D5DB', color: '#9CA3AF' },
-            }}
-          >
-            {loading ? 'Saving…' : isEdit ? 'Update Plan' : 'Create Plan'}
-          </Button>
-        </Stack>
-      </Box>
+        {/* Save button — top-right, matching image */}
+        <Button
+          variant="contained"
+          startIcon={
+            loading
+              ? <CircularProgress size={14} sx={{ color: '#fff' }} />
+              : <SaveIcon sx={{ fontSize: 16 }} />
+          }
+          onClick={handleSubmit}
+          disabled={loading}
+          sx={{
+            backgroundColor: '#27235C',
+            borderRadius: '8px',
+            fontWeight: 600,
+            fontSize: '0.82rem',
+            textTransform: 'none',
+            px: 2.5,
+            height: 38,
+            flexShrink: 0,
+            '&:hover': { backgroundColor: '#1B193F' },
+            '&.Mui-disabled': { background: '#D1D5DB', color: '#9CA3AF' },
+          }}
+        >
+          {loading ? 'Saving…' : isEdit ? 'Update Plan' : 'Create Plan'}
+        </Button>
+      </Stack>
 
-      {/* ── Form Card ─────────────────────────────────────────────────────── */}
+      {/* ── Form Card ───────────────────────────────────────────────────────── */}
       <Paper
         elevation={0}
         sx={{
           border: '1px solid #E5E7EB',
-          borderRadius: '14px',
+          borderRadius: 2,
           overflow: 'hidden',
-          boxShadow: '0 2px 16px rgba(39,35,92,0.07)',
           width: '100%',
         }}
       >
 
         {/* ══ Section 1: Basic Information ══════════════════════════════════ */}
-        <Box sx={{ px: { xs: 2.5, md: 3.5 }, pt: 3, pb: 3 }}>
-          <SectionHeader label="Basic Information" />
+        <Box sx={{ px: 3, pt: 3, pb: 3 }}>
 
           <Grid container spacing={2.5} alignItems="flex-start">
 
             {/* Title — full width */}
             <Grid item xs={12}>
-              <SectionLabel required>Change Title</SectionLabel>
+              <SectionLabel required>Title</SectionLabel>
               <TextField
                 fullWidth
                 placeholder="e.g. Database schema migration for v2.5"
@@ -670,7 +599,7 @@ export default function ChangeFormPage() {
                   value={form.changeType}
                   onChange={e => handleChange('changeType', e.target.value)}
                   displayEmpty
-                  sx={{ height: 42, borderRadius: '8px', backgroundColor: '#F8FAFF', fontSize: '0.85rem' }}
+                  sx={{ height: 42, borderRadius: '8px', backgroundColor: '#fff', fontSize: '0.85rem' }}
                 >
                   {CHANGE_TYPES.map(t => (
                     <MenuItem key={t} value={t} sx={{ fontSize: '0.85rem', gap: 1 }}>
@@ -679,7 +608,9 @@ export default function ChangeFormPage() {
                     </MenuItem>
                   ))}
                 </Select>
-                {errors.changeType && <FormHelperText sx={{ fontSize: '0.7rem', mt: 0.3 }}>{errors.changeType}</FormHelperText>}
+                {errors.changeType && (
+                  <FormHelperText sx={{ fontSize: '0.7rem', mt: 0.3 }}>{errors.changeType}</FormHelperText>
+                )}
               </FormControl>
             </Grid>
 
@@ -691,7 +622,7 @@ export default function ChangeFormPage() {
                   value={form.priority}
                   onChange={e => handleChange('priority', e.target.value)}
                   displayEmpty
-                  sx={{ height: 42, borderRadius: '8px', backgroundColor: '#F8FAFF', fontSize: '0.85rem' }}
+                  sx={{ height: 42, borderRadius: '8px', backgroundColor: '#fff', fontSize: '0.85rem' }}
                 >
                   {PRIORITIES.map(p => (
                     <MenuItem key={p} value={p} sx={{ fontSize: '0.85rem', gap: 1 }}>
@@ -700,18 +631,19 @@ export default function ChangeFormPage() {
                     </MenuItem>
                   ))}
                 </Select>
-                {errors.priority && <FormHelperText sx={{ fontSize: '0.7rem', mt: 0.3 }}>{errors.priority}</FormHelperText>}
+                {errors.priority && (
+                  <FormHelperText sx={{ fontSize: '0.7rem', mt: 0.3 }}>{errors.priority}</FormHelperText>
+                )}
               </FormControl>
             </Grid>
 
           </Grid>
         </Box>
 
-        <Divider sx={{ borderColor: '#F0F2F8' }} />
+        <Divider sx={{ borderColor: '#E5E7EB' }} />
 
         {/* ══ Section 2: Schedule ═══════════════════════════════════════════ */}
-        <Box sx={{ px: { xs: 2.5, md: 3.5 }, py: 3, backgroundColor: '#FAFBFF' }}>
-          <SectionHeader label="Schedule" />
+        <Box sx={{ px: 3, py: 3 }}>
 
           <Grid container spacing={2.5} alignItems="flex-start">
 
@@ -758,13 +690,11 @@ export default function ChangeFormPage() {
           </Grid>
         </Box>
 
-        <Divider sx={{ borderColor: '#F0F2F8' }} />
+        <Divider sx={{ borderColor: '#E5E7EB' }} />
 
         {/* ══ Section 3: Description ════════════════════════════════════════ */}
-        <Box sx={{ px: { xs: 2.5, md: 3.5 }, py: 3 }}>
-          <SectionHeader label="Description" />
-
-          <SectionLabel>Change Description</SectionLabel>
+        <Box sx={{ px: 3, py: 3 }}>
+          <InlineSectionLabel required>Description</InlineSectionLabel>
           <RichTextEditor
             value={form.description}
             onChange={v => handleChange('description', v)}
@@ -774,13 +704,11 @@ export default function ChangeFormPage() {
           />
         </Box>
 
-        {/* ══ Form Footer: Cancel + Submit ══════════════════════════════════ */}
+        {/* ══ Footer: Cancel + Submit ═══════════════════════════════════════ */}
         <Box
           sx={{
-            px: { xs: 2.5, md: 3.5 },
-            py: 2.25,
-            borderTop: '1px solid #F0F2F8',
-            backgroundColor: '#FAFBFF',
+            px: 3, py: 2,
+            borderTop: '1px solid #E5E7EB',
             display: 'flex',
             justifyContent: 'flex-end',
             alignItems: 'center',
@@ -799,7 +727,7 @@ export default function ChangeFormPage() {
               textTransform: 'none',
               px: 2.5,
               height: 38,
-              '&:hover': { borderColor: '#9CA3AF', backgroundColor: '#F9FAFB' },
+              '&:hover': { borderColor: '#9CA3AF', backgroundColor: 'transparent' },
             }}
           >
             Cancel
@@ -807,19 +735,22 @@ export default function ChangeFormPage() {
 
           <Button
             variant="contained"
-            startIcon={loading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 16 }} />}
+            startIcon={
+              loading
+                ? <CircularProgress size={14} sx={{ color: '#fff' }} />
+                : <SaveIcon sx={{ fontSize: 16 }} />
+            }
             onClick={handleSubmit}
             disabled={loading}
             sx={{
-              background: 'linear-gradient(135deg,#27235C,#97247E)',
+              backgroundColor: '#27235C',
               borderRadius: '8px',
               fontWeight: 700,
               fontSize: '0.82rem',
               textTransform: 'none',
               px: 2.5,
               height: 38,
-              boxShadow: '0 3px 10px rgba(39,35,92,0.22)',
-              '&:hover': { background: 'linear-gradient(135deg,#1e1a47,#7a1c65)' },
+              '&:hover': { backgroundColor: '#1B193F' },
               '&.Mui-disabled': { background: '#D1D5DB', color: '#9CA3AF' },
             }}
           >

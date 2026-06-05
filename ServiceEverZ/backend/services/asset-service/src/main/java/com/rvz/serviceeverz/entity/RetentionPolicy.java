@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import com.rvz.serviceeverz.enums.RetentionFrequency;
+import com.rvz.serviceeverz.enums.RetentionType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -33,7 +34,17 @@ public class RetentionPolicy {
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
+	private RetentionType type;
+
+	@Column(columnDefinition = "TEXT")
+	private String customType;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
 	private RetentionFrequency frequency;
+
+	@Column(columnDefinition = "TEXT")
+	private String customFrequency;
 
 	@Column(nullable = false)
 	private Integer retentionDays;
@@ -74,12 +85,36 @@ public class RetentionPolicy {
 		this.description = description;
 	}
 
+	public RetentionType getType() {
+		return type;
+	}
+
+	public void setType(RetentionType type) {
+		this.type = type;
+	}
+
+	public String getCustomType() {
+		return customType;
+	}
+
+	public void setCustomType(String customType) {
+		this.customType = customType;
+	}
+
 	public RetentionFrequency getFrequency() {
 		return frequency;
 	}
 
 	public void setFrequency(RetentionFrequency frequency) {
 		this.frequency = frequency;
+	}
+
+	public String getCustomFrequency() {
+		return customFrequency;
+	}
+
+	public void setCustomFrequency(String customFrequency) {
+		this.customFrequency = customFrequency;
 	}
 
 	public Integer getRetentionDays() {

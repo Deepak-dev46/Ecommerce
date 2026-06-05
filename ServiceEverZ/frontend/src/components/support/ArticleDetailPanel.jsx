@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { getVersionById, getAttachmentDownloadUrl } from '../../api/kbApi'
 import StatusBadge from '../StatusBadge'
+import DOMPurify from 'dompurify'
 
 function formatBytes(bytes) {
   if (!bytes) return ''
@@ -9,7 +10,7 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// ── Attachment viewer for the support personnel panel ──────────────────────
+// ── Attachment preview section ─────────────────────────────────────────────
 function AttachmentSection({ versionId, mimeType, originalName, sizeBytes }) {
   if (!originalName || !versionId) return null
   const isPdf = mimeType === 'application/pdf'
@@ -18,26 +19,23 @@ function AttachmentSection({ versionId, mimeType, originalName, sizeBytes }) {
 
   const downloadUrl = getAttachmentDownloadUrl(versionId)
   const sizeLabel = formatBytes(sizeBytes)
-  const [downloading, setDownloading] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
+  const [previewUrl, setPreviewUrl] = React.useState(null)
+  const [error, setError] = React.useState(null)
 
-  const handleDownload = async () => {
-    setDownloading(true)
+  const handlePreview = async () => {
+    if (previewUrl) { setPreviewUrl(null); return }
+    setLoading(true)
+    setError(null)
     try {
       const res = await fetch(downloadUrl)
-      if (!res.ok) throw new Error('Download failed')
+      if (!res.ok) throw new Error('Failed to load file')
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = originalName
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      setPreviewUrl(URL.createObjectURL(blob))
     } catch {
-      // silent fail
+      setError('Could not load preview. Please try again.')
     } finally {
-      setDownloading(false)
+      setLoading(false)
     }
   }
 
@@ -49,22 +47,56 @@ function AttachmentSection({ versionId, mimeType, originalName, sizeBytes }) {
           {originalName}{sizeLabel ? ` · ${sizeLabel}` : ''}
         </span>
       </h4>
-      <div style={{ marginTop: '10px' }}>
+      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
         <button
-          onClick={handleDownload}
-          disabled={downloading}
+          onClick={handlePreview}
+          disabled={loading}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '8px 16px', background: downloading ? '#93c5fd' : '#2563eb',
+            padding: '8px 16px', background: loading ? '#93c5fd' : previewUrl ? '#6b7280' : '#2563eb',
             color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
-            border: 'none', cursor: downloading ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
+            border: 'none', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
           }}
-          onMouseEnter={e => { if (!downloading) e.currentTarget.style.background = '#1d4ed8' }}
-          onMouseLeave={e => { if (!downloading) e.currentTarget.style.background = '#2563eb' }}
         >
-          {downloading ? '⏳ Downloading…' : `⬇ Download ${isPdf ? 'PDF' : 'Video'}`}
+          {loading ? '⏳ Loading…' : previewUrl ? '✕ Close Preview' : `👁 Preview ${isPdf ? 'PDF' : 'Video'}`}
         </button>
+        <a
+          href={downloadUrl}
+          download={originalName}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '8px 16px', background: '#f0fdf4', color: '#15803d',
+            borderRadius: '7px', fontSize: '13px', fontWeight: 600,
+            border: '1.5px solid #86efac', textDecoration: 'none',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+        >
+          ⬇ Download
+        </a>
       </div>
+      {error && <p style={{ color: '#ef4444', fontSize: 12, marginTop: 8 }}>{error}</p>}
+      {previewUrl && isPdf && (
+        <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+          <iframe
+            src={previewUrl}
+            title={originalName}
+            width="100%"
+            height="520px"
+            style={{ display: 'block', border: 'none' }}
+          />
+        </div>
+      )}
+      {previewUrl && isVideo && (
+        <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+          <video
+            src={previewUrl}
+            controls
+            style={{ width: '100%', maxHeight: '400px', display: 'block' }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -179,7 +211,7 @@ export default function ArticleDetailPanel({
 
         {activeTab === 'article' && (
           <>
-            {/* ── Attachment (PDF/Video) — shown above text fields ── */}
+            {/* ── Attachment (PDF/Video) — inline preview ── */}
             {detail.attachmentOriginalName && (
               <AttachmentSection
                 versionId={detail.currentVersionId}
@@ -189,19 +221,38 @@ export default function ArticleDetailPanel({
               />
             )}
 
-            {/* {hasContent(detail.summary) && <div className="detail-section"><h4>Summary</h4><div dangerouslySetInnerHTML={{ __html: detail.summary }} /></div>} */}
-            {/* {hasContent(detail.affectedService) && <div className="detail-section"><h4>Affected Service</h4><div dangerouslySetInnerHTML={{ __html: detail.affectedService }} /></div>}
-            {hasContent(detail.symptoms) && <div className="detail-section"><h4>Symptoms</h4><div dangerouslySetInnerHTML={{ __html: detail.symptoms }} /></div>}
-            {hasContent(detail.resolutionSteps) && <div className="detail-section"><h4>Resolution Steps</h4><div dangerouslySetInnerHTML={{ __html: detail.resolutionSteps }} /></div>}
-            {hasContent(detail.rootCause) && <div className="detail-section"><h4>Root Cause</h4><div dangerouslySetInnerHTML={{ __html: detail.rootCause }} /></div>}
-            {hasContent(detail.workaround) && <div className="detail-section"><h4>Workaround</h4><div dangerouslySetInnerHTML={{ __html: detail.workaround }} /></div>}
-            {detail.referencesLinks?.trim() && <div className="detail-section"><h4>Reference Links</h4><p>{detail.referencesLinks}</p></div>}
+            {/* ── Summary ── */}
+            {hasContent(detail.summary) && (
+              <div className="detail-section">
+                <h4>Summary</h4>
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(detail.summary) }} />
+              </div>
+            )}
+
+            {/* ── Content / Description ── */}
+            {hasContent(detail.content) && (
+              <div className="detail-section">
+                <h4>Content</h4>
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(detail.content) }} />
+              </div>
+            )}
+
+            {/* ── Resolution Steps ── */}
+            {hasContent(detail.resolutionSteps) && (
+              <div className="detail-section">
+                <h4>Resolution Steps</h4>
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(detail.resolutionSteps) }} />
+              </div>
+            )}
+
+            {/* ── Tags ── */}
             {detail.tags?.length > 0 && (
               <div className="detail-section">
                 <h4>Tags</h4>
                 <div className="tags">{detail.tags.map(t => <span key={t} className="tag">{t}</span>)}</div>
               </div>
-            )} */}
+            )}
+
             <div className="detail-section">
               <h4>Dates</h4>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -257,11 +308,15 @@ export default function ArticleDetailPanel({
                       <p className="text-muted mt-8">Loading version...</p>
                     ) : verDetail ? (
                       <div className="version-detail-box">
+                        {verDetail.attachmentOriginalName && (
+                          <AttachmentSection
+                            versionId={v.versionId}
+                            mimeType={verDetail.attachmentMimeType}
+                            originalName={verDetail.attachmentOriginalName}
+                            sizeBytes={verDetail.attachmentSizeBytes}
+                          />
+                        )}
                         {hasContent(verDetail.summary) && <><h5>Summary</h5><div dangerouslySetInnerHTML={{ __html: verDetail.summary }} /></>}
-                        {/* {hasContent(verDetail.resolutionSteps) && <><h5>Resolution Steps</h5><div dangerouslySetInnerHTML={{ __html: verDetail.resolutionSteps }} /></>}
-                        {hasContent(verDetail.symptoms) && <><h5>Symptoms</h5><div dangerouslySetInnerHTML={{ __html: verDetail.symptoms }} /></>}
-                        {hasContent(verDetail.rootCause) && <><h5>Root Cause</h5><div dangerouslySetInnerHTML={{ __html: verDetail.rootCause }} /></>}
-                        {hasContent(verDetail.workaround) && <><h5>Workaround</h5><div dangerouslySetInnerHTML={{ __html: verDetail.workaround }} /></>} */}
                       </div>
                     ) : null
                   )}

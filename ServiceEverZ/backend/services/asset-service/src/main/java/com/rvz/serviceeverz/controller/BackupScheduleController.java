@@ -3,6 +3,7 @@ package com.rvz.serviceeverz.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.rvz.serviceeverz.dto.request.CreateBackupScheduleRequest;
@@ -20,19 +22,18 @@ import com.rvz.serviceeverz.service.BackupScheduleService;
 
 import jakarta.validation.Valid;
 
-
 @RestController
 @RequestMapping("/api/assets/data-management/backup-schedules")
+@CrossOrigin
 public class BackupScheduleController {
 
     private final BackupScheduleService backupScheduleService;
 
     public BackupScheduleController(BackupScheduleService backupScheduleService) {
-		super();
-		this.backupScheduleService = backupScheduleService;
-	}
+        this.backupScheduleService = backupScheduleService;
+    }
 
-	// POST /api/assets/data-management/backup-schedules
+    // POST /api/assets/data-management/backup-schedules
     @PostMapping
     public ResponseEntity<BackupScheduleResponse> create(
             @Valid @RequestBody CreateBackupScheduleRequest request) {
@@ -49,12 +50,6 @@ public class BackupScheduleController {
     @GetMapping("/{id}")
     public ResponseEntity<BackupScheduleResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(backupScheduleService.getScheduleById(id));
-    }
-
-    // GET /api/assets/data-management/backup-schedules/sp/{spId}
-    @GetMapping("/sp/{spId}")
-    public ResponseEntity<List<BackupScheduleResponse>> getBySp(@PathVariable Long spId) {
-        return ResponseEntity.ok(backupScheduleService.getSchedulesBySp(spId));
     }
 
     // GET /api/assets/data-management/backup-schedules/status/{status}
@@ -79,6 +74,32 @@ public class BackupScheduleController {
     @GetMapping("/asset-specific")
     public ResponseEntity<List<BackupScheduleResponse>> getAssetSpecific() {
         return ResponseEntity.ok(backupScheduleService.getAssetSpecificSchedules());
+    }
+
+    // GET /api/assets/data-management/backup-schedules/upcoming
+    @GetMapping("/upcoming")
+    public ResponseEntity<List<BackupScheduleResponse>> getUpcoming() {
+        return ResponseEntity.ok(backupScheduleService.getUpcomingSchedules());
+    }
+
+    /**
+     * GET /api/assets/data-management/backup-schedules/nearing?days=10
+     * Returns all schedules whose nextBackupDate is within the next N days (default 10),
+     * sorted by nextBackupDate ascending — the "upcoming next backup" date-wise view.
+     */
+    @GetMapping("/nearing")
+    public ResponseEntity<List<BackupScheduleResponse>> getNearing(
+            @RequestParam(defaultValue = "10") int days) {
+        return ResponseEntity.ok(backupScheduleService.getSchedulesDueWithinDays(days));
+    }
+
+    /**
+     * GET /api/assets/data-management/backup-schedules/by-next-backup-date
+     * Returns ALL schedules sorted by nextBackupDate ascending (date-wise view).
+     */
+    @GetMapping("/by-next-backup-date")
+    public ResponseEntity<List<BackupScheduleResponse>> getAllByNextBackupDate() {
+        return ResponseEntity.ok(backupScheduleService.getAllSchedulesByNextBackupDate());
     }
 
     // PUT /api/assets/data-management/backup-schedules/{id}

@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.rvz.serviceeverz.dto.response.ApiResponse;
 
@@ -21,6 +22,18 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiResponse<String>> handleNotFound(ProblemNotFoundException ex) {
 		log.warn("Not found: {}", ex.getMessage());
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(false, ex.getMessage(), null));
+	}
+
+	@ExceptionHandler(AttachmentNotFoundException.class)
+	public ResponseEntity<ApiResponse<String>> handleAttachmentNotFound(AttachmentNotFoundException ex) {
+		log.warn("Attachment not found: {}", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(false, ex.getMessage(), null));
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<ApiResponse<String>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+		return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+				.body(new ApiResponse<>(false, "File size exceeds the maximum allowed limit.", null));
 	}
 
 	@ExceptionHandler(IllegalStateException.class)
