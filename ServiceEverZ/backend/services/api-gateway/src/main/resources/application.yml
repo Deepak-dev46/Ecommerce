@@ -153,6 +153,13 @@ spring:
             - Path=/api/sla/**
           filters:
             - StripPrefix=0
+        # ── EMAIL SERVICE ─────────────────────────────────────────
+        - id: email-service
+          uri: lb://email-service
+          predicates:
+            - Path=/api/v1/email/**
+          filters:
+            - StripPrefix=0
 
         # ── ACTION SERVICE ──────────────────────────────────────
         - id: action-service

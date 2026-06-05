@@ -57,7 +57,9 @@ public class CreateTicketRequest {
 
     private String   attachmentName;
     private Long     attachmentSizeBytes;
-
+    private String attachmentBase64;
+    private String attachmentMimeType;
+     
     //private LocalDate accessRequiredTill;
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime accessRequiredTill;
@@ -138,5 +140,11 @@ public class CreateTicketRequest {
 	public void setAccessRequiredTill(LocalDateTime accessRequiredTill) {
 		this.accessRequiredTill = accessRequiredTill;
 	}
+	
+	public String getAttachmentBase64()             { return attachmentBase64; }
+	public void   setAttachmentBase64(String v)     { this.attachmentBase64 = v; }
+	public String getAttachmentMimeType()           { return attachmentMimeType; }
+	public void   setAttachmentMimeType(String v)   { this.attachmentMimeType = v; }
+	 
     
 }

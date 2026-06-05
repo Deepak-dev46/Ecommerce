@@ -1220,7 +1220,7 @@ export default function ITSMTicketDetailPage() {
 
   // ✅ NEW: Dedicated Resume handler — calls resumeTicket API with SLA logic
   const handleResumeWork = async () => {
-    setActionLoading('IN_PROGRESS');
+    setActionLoading('OPEN');
     try {
       const { data: updated } = await resumeTicket(ticket.id);
       toast.success('Ticket resumed');
