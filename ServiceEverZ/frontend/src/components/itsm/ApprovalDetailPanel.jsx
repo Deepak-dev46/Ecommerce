@@ -13,26 +13,26 @@ function AttachmentSection({ versionId, mimeType, originalName, sizeBytes }) {
 
   const downloadUrl = getAttachmentDownloadUrl(versionId);
   const sizeLabel = sizeBytes ? formatBytes(sizeBytes) : '';
-  const [downloading, setDownloading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [error, setError] = useState(null);
 
-  const handleDownload = async () => {
-    setDownloading(true);
+  const handlePreview = async () => {
+    if (previewUrl) { setPreviewUrl(null); return; }
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(downloadUrl);
-      if (!res.ok) throw new Error('Download failed');
+      const token = (await import('../../utils/tokenUtils')).tokenUtils.getToken();
+      const res = await fetch(downloadUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to load file');
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = originalName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      setPreviewUrl(URL.createObjectURL(blob));
     } catch {
-      toast.error('Failed to download file. Please try again.');
+      setError('Could not load preview. Please try again.');
     } finally {
-      setDownloading(false);
+      setLoading(false);
     }
   };
 
@@ -45,31 +45,86 @@ function AttachmentSection({ versionId, mimeType, originalName, sizeBytes }) {
         </span>
       </h4>
 
-      {/* Download button — triggers only on click, no auto-download */}
-      <div style={{ marginTop: '10px' }}>
+      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        {/* Preview toggle button */}
         <button
-          onClick={handleDownload}
-          disabled={downloading}
+          onClick={handlePreview}
+          disabled={loading}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
             padding: '8px 16px',
-            background: downloading ? '#93c5fd' : '#2563eb',
+            background: loading ? '#93c5fd' : previewUrl ? '#6b7280' : '#2563eb',
             color: '#fff',
             borderRadius: '7px',
             fontSize: '13px',
             fontWeight: 600,
             border: 'none',
-            cursor: downloading ? 'not-allowed' : 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s',
           }}
-          onMouseEnter={e => { if (!downloading) e.currentTarget.style.background = '#1d4ed8'; }}
-          onMouseLeave={e => { if (!downloading) e.currentTarget.style.background = '#2563eb'; }}
         >
-          {downloading ? '⏳ Downloading…' : `⬇ Download ${isPdf ? 'PDF' : 'Video'} for Verification`}
+          {loading ? '⏳ Loading…' : previewUrl ? '✕ Close Preview' : `👁 Preview ${isPdf ? 'PDF' : 'Video'}`}
         </button>
+
+        {/* Download link */}
+        <a
+          href={downloadUrl}
+          download={originalName}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 16px',
+            background: '#f0fdf4',
+            color: '#15803d',
+            borderRadius: '7px',
+            fontSize: '13px',
+            fontWeight: 600,
+            border: '1.5px solid #86efac',
+            textDecoration: 'none',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+        >
+          ⬇ Download {isPdf ? 'PDF' : 'Video'}
+        </a>
       </div>
+
+      {error && <p style={{ color: '#ef4444', fontSize: 12, marginTop: 8 }}>{error}</p>}
+
+      {/* PDF inline preview */}
+      {previewUrl && isPdf && (
+        <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+          <iframe
+            src={previewUrl}
+            title={originalName}
+            width="100%"
+            height="520px"
+            style={{ display: 'block', border: 'none' }}
+          />
+        </div>
+      )}
+
+      {/* Video inline preview */}
+      {previewUrl && isVideo && (
+        <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+          <video
+            src={previewUrl}
+            controls
+            style={{ width: '100%', maxHeight: '400px', display: 'block' }}
+          />
+        </div>
+      )}
+
+      {/* Reminder to review before deciding */}
+      {!previewUrl && !loading && (
+        <p style={{ fontSize: 12, color: '#92400e', marginTop: 8 }}>
+          ⚠ Please preview or download the {isPdf ? 'PDF' : 'video'} before making your approval decision.
+        </p>
+      )}
     </div>
   );
 }
@@ -314,15 +369,7 @@ export default function ApprovalDetailPanel({ detail, versions, approverId, onDe
                   <div className="alert-warn">No IN_REVIEW version found for this article.</div>
                 )}
 
-                {/* Reminder for file-type articles */}
-                {hasAttachment && inReviewVersion && (
-                  <div style={{
-                    padding: '8px 14px', background: '#fef3c7', borderRadius: '7px',
-                    borderLeft: '4px solid #f59e0b', fontSize: '13px', color: '#92400e', marginBottom: '10px',
-                  }}>
-                    ⚠ Please download and verify the {attachmentMimeType?.startsWith('video/') ? 'video' : 'PDF'} file above before making your approval decision.
-                  </div>
-                )}
+
 
                 <div className="comment-box">
                   <textarea

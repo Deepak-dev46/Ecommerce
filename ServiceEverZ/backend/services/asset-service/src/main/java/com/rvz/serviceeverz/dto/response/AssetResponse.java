@@ -2,6 +2,9 @@ package com.rvz.serviceeverz.dto.response;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.rvz.serviceeverz.enums.AssetCategory;
 import com.rvz.serviceeverz.enums.AssetOwnershipType;
 import com.rvz.serviceeverz.enums.AssetStatus;
@@ -17,10 +20,60 @@ public class AssetResponse {
 	private LocalDateTime createdAt, updatedAt;
 	private LocalDate purchaseDate, warrantyExpiryDate;
 	private Double purchaseCost, depreciationRatePercent;
-	private String rentalVendorName, rentalVendorContact, rentalContractNumber, rentalReturnCondition;
+	private String rentalVendorName, rentalVendorContact, rentalVendorEmail, rentalContractNumber,
+			rentalReturnCondition;
 	private LocalDate rentalStartDate, rentalEndDate, rentalReturnedDate;
 	private Double rentalCostPerMonth, rentalDepositAmount;
 	private Boolean rentalRenewalOption, rentalExpiringSoon;
+	/** True when a PDF/image invoice is stored for this asset. */
+	private boolean hasInvoice;
+	/** MIME type of the stored invoice, e.g. "application/pdf". */
+	private String invoiceContentType;
+	/** Original file name for display. */
+	private String invoiceFileName;
+
+	// ── NEW: Category-specific specifications ─────────────────────
+	private List<AssetSpecificationResponse> specifications = new ArrayList<>();
+
+	public String getRentalVendorEmail() {
+		return rentalVendorEmail;
+	}
+
+	public void setRentalVendorEmail(String v) {
+		rentalVendorEmail = v;
+	}
+
+	public boolean isHasInvoice() {
+		return hasInvoice;
+	}
+
+	public void setHasInvoice(boolean hasInvoice) {
+		this.hasInvoice = hasInvoice;
+	}
+
+	public String getInvoiceContentType() {
+		return invoiceContentType;
+	}
+
+	public void setInvoiceContentType(String invoiceContentType) {
+		this.invoiceContentType = invoiceContentType;
+	}
+
+	public String getInvoiceFileName() {
+		return invoiceFileName;
+	}
+
+	public void setInvoiceFileName(String invoiceFileName) {
+		this.invoiceFileName = invoiceFileName;
+	}
+
+	public List<AssetSpecificationResponse> getSpecifications() {
+		return specifications;
+	}
+
+	public void setSpecifications(List<AssetSpecificationResponse> specifications) {
+		this.specifications = specifications;
+	}
 
 	public Long getId() {
 		return id;

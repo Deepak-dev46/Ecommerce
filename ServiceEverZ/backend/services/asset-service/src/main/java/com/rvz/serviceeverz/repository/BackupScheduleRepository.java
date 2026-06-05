@@ -1,5 +1,6 @@
 package com.rvz.serviceeverz.repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,17 +12,26 @@ import com.rvz.serviceeverz.enums.BackupStatus;
 @Repository
 public interface BackupScheduleRepository extends JpaRepository<BackupSchedule, Long> {
 
-	 List<BackupSchedule> findAllByCreatedBySpId(Long spId);
+    List<BackupSchedule> findAllByStatus(BackupStatus status);
 
-	    // Filter by backup status
-	    List<BackupSchedule> findAllByStatus(BackupStatus status);
+    List<BackupSchedule> findAllByAssetId(Long assetId);
 
-	    // All schedules for a specific asset
-	    List<BackupSchedule> findAllByAssetId(Long assetId);
+    List<BackupSchedule> findAllByAssetIdIsNull();
 
-	    // Only generic backups (no asset linked)
-	    List<BackupSchedule> findAllByAssetIdIsNull();
+    List<BackupSchedule> findAllByAssetIdIsNotNull();
 
-	    // Only asset-specific backups
-	    List<BackupSchedule> findAllByAssetIdIsNotNull();
+    // Upcoming: SCHEDULED status with a future scheduledDate
+    List<BackupSchedule> findAllByStatusAndScheduledDateAfter(BackupStatus status, LocalDate date);
+
+    // Backups scheduled within the next N days (for "nearing" reminder logic)
+    List<BackupSchedule> findAllByStatusAndNextBackupDateBetween(
+            BackupStatus status, LocalDate from, LocalDate to);
+
+    // All schedules with a nextBackupDate in a given range regardless of status
+    List<BackupSchedule> findAllByNextBackupDateBetween(LocalDate from, LocalDate to);
+
+    // Ordered by nextBackupDate ascending — used for date-wise listing
+    List<BackupSchedule> findAllByOrderByNextBackupDateAsc();
+
+    List<BackupSchedule> findAllByStatusOrderByScheduledDateAsc(BackupStatus status);
 }

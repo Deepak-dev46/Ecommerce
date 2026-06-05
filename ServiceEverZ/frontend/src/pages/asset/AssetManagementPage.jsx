@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, Button, MenuItem, Select, FormControl,
   InputLabel, Dialog, DialogContent, DialogTitle, DialogActions, DialogContentText,
-  IconButton, Alert,
+  IconButton, Alert, Drawer,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   TablePagination,
 } from '@mui/material';
@@ -268,7 +268,7 @@ export default function AssetManagementPage() {
                       <Button
                         size="small"
                         variant="outlined"
-                        onClick={() => navigate('/support/asset')}
+                        onClick={(e) => { e.stopPropagation(); setEditAsset(a); setFormOpen(true); }}
                         sx={{
                           fontSize: '0.68rem', px: 1.2, py: 0.3, minWidth: 0,
                           borderColor: '#1B1F5E', color: '#1B1F5E',
@@ -369,14 +369,31 @@ export default function AssetManagementPage() {
         </DialogActions>
       </Dialog>
  
-      {/* Asset Detail Dialog */}
-      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
-          <span>Asset Details</span>
-          <IconButton onClick={() => setDetailOpen(false)}><CloseIcon /></IconButton>
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 3 }}>
+      {/* Asset Detail Drawer */}
+      <Drawer
+        anchor="right"
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        PaperProps={{
+          sx: {
+            width: { xs: '100vw', sm: 600, md: 720 },
+            borderRadius: '16px 0 0 16px',
+            boxShadow: '-4px 0 32px rgba(39,35,92,0.12)',
+            top: '60px',
+            height: 'calc(100% - 60px)',
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2, borderBottom: '1px solid #E8E8F0', backgroundColor: '#FAFBFF' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: '#1A1A2E', fontFamily: "'Inter', sans-serif" }}>
+            Asset Details
+          </Typography>
+          <IconButton onClick={() => setDetailOpen(false)} size="small" sx={{ color: '#6B6B8A' }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        <Box sx={{ overflowY: 'auto', p: 3, flex: 1 }}>
           {selected && (
             <AssetDetailPanel
               asset={selected}
@@ -384,8 +401,8 @@ export default function AssetManagementPage() {
               onDelete={() => { setDetailOpen(false); handleDeleteRequest(selected); }}
             />
           )}
-        </DialogContent>
-      </Dialog>
+        </Box>
+      </Drawer>
  
       {/* Add/Edit Dialog */}
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="md" fullWidth

@@ -2,9 +2,13 @@ package com.rvz.serviceeverz.controller;
 
 import java.util.List;
 
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.rvz.serviceeverz.dto.request.CreateProblemRequest;
 import com.rvz.serviceeverz.dto.request.LinkIncidentRequest;
@@ -21,9 +27,12 @@ import com.rvz.serviceeverz.dto.request.RcaRequest;
 import com.rvz.serviceeverz.dto.request.WorkaroundRequest;
 import com.rvz.serviceeverz.dto.response.ApiResponse;
 import com.rvz.serviceeverz.dto.response.KnownErrorRecordResponse;
+import com.rvz.serviceeverz.dto.response.ProblemAttachmentResponse;
 import com.rvz.serviceeverz.dto.response.ProblemResponse;
+import com.rvz.serviceeverz.enums.AttachmentSection;
 import com.rvz.serviceeverz.enums.ProblemPriority;
 import com.rvz.serviceeverz.enums.ProblemStatus;
+import com.rvz.serviceeverz.service.ProblemAttachmentService;
 import com.rvz.serviceeverz.service.ProblemService;
 
 import jakarta.validation.Valid;
@@ -33,11 +42,15 @@ import jakarta.validation.Valid;
 @CrossOrigin
 public class ProblemController {
 
-	private final ProblemService service;
+	private final ProblemService           service;
+	private final ProblemAttachmentService attachmentService;
 
-	public ProblemController(ProblemService service) {
-		this.service = service;
+	public ProblemController(ProblemService service, ProblemAttachmentService attachmentService) {
+		this.service           = service;
+		this.attachmentService = attachmentService;
 	}
+
+	// ── Core Problem Endpoints ────────────────────────────────────
 
 	@PostMapping
 	public ResponseEntity<ApiResponse<ProblemResponse>> create(@Valid @RequestBody CreateProblemRequest request) {
@@ -137,5 +150,109 @@ public class ProblemController {
 	@GetMapping("/health")
 	public ResponseEntity<ApiResponse<String>> health() {
 		return ResponseEntity.ok(new ApiResponse<>(true, "Problem service running", "UP"));
+	}
+
+	// ── Attachment Endpoints ──────────────────────────────────────
+
+	/**
+	 * POST /api/problems/{id}/attachments
+	 *
+	 * Upload a file attached to a specific section of a problem.
+	 *
+	 * Request (multipart/form-data):
+	 *   - file          : the file to upload (any format)
+	 *   - section       : SOLUTION | ROOT_CAUSE | WORKAROUND | PERMANENT_FIX
+	 *   - uploadedBySpId: ID of the SP doing the upload
+	 */
+	@PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<ApiResponse<ProblemAttachmentResponse>> uploadAttachment(
+			@PathVariable Long id,
+			@RequestParam("file") MultipartFile file,
+			@RequestParam("section") AttachmentSection section,
+			@RequestParam("uploadedBySpId") Long uploadedBySpId) {
+
+		ProblemAttachmentResponse response =
+				attachmentService.uploadAttachment(id, section, file, uploadedBySpId);
+		response.setDownloadUrl(buildDownloadUrl(id, response.getId()));
+
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(new ApiResponse<>(true, "Attachment uploaded", response));
+	}
+
+	/**
+	 * GET /api/problems/{id}/attachments
+	 *
+	 * List all attachments for a problem.
+	 * Optional query param: section=ROOT_CAUSE (etc.) to filter.
+	 */
+	@GetMapping("/{id}/attachments")
+	public ResponseEntity<ApiResponse<List<ProblemAttachmentResponse>>> listAttachments(
+			@PathVariable Long id,
+			@RequestParam(required = false) AttachmentSection section) {
+
+		List<ProblemAttachmentResponse> list = attachmentService.getAttachments(id, section);
+		list.forEach(a -> a.setDownloadUrl(buildDownloadUrl(id, a.getId())));
+
+		return ResponseEntity.ok(new ApiResponse<>(true, "Attachments fetched", list));
+	}
+
+	/**
+	 * GET /api/problems/{id}/attachments/{attachmentId}
+	 *
+	 * Get metadata for a single attachment.
+	 */
+	@GetMapping("/{id}/attachments/{attachmentId}")
+	public ResponseEntity<ApiResponse<ProblemAttachmentResponse>> getAttachment(
+			@PathVariable Long id,
+			@PathVariable Long attachmentId) {
+
+		ProblemAttachmentResponse response = attachmentService.getAttachmentById(id, attachmentId);
+		response.setDownloadUrl(buildDownloadUrl(id, attachmentId));
+
+		return ResponseEntity.ok(new ApiResponse<>(true, "Attachment fetched", response));
+	}
+
+	/**
+	 * GET /api/problems/{id}/attachments/{attachmentId}/download
+	 *
+	 * Stream/download the actual file. The browser receives it with the
+	 * original file name and correct content type.
+	 */
+	@GetMapping("/{id}/attachments/{attachmentId}/download")
+	public ResponseEntity<Resource> downloadAttachment(
+			@PathVariable Long id,
+			@PathVariable Long attachmentId) {
+
+		ProblemAttachmentResponse meta     = attachmentService.getAttachmentById(id, attachmentId);
+		Resource                  resource = attachmentService.loadAttachmentAsResource(id, attachmentId);
+
+		return ResponseEntity.ok()
+				.contentType(MediaType.parseMediaType(meta.getContentType()))
+				.header(HttpHeaders.CONTENT_DISPOSITION,
+						"attachment; filename=\"" + meta.getOriginalFileName() + "\"")
+				.body(resource);
+	}
+
+	/**
+	 * DELETE /api/problems/{id}/attachments/{attachmentId}
+	 *
+	 * Delete an attachment (record + physical file).
+	 */
+	@DeleteMapping("/{id}/attachments/{attachmentId}")
+	public ResponseEntity<ApiResponse<String>> deleteAttachment(
+			@PathVariable Long id,
+			@PathVariable Long attachmentId) {
+
+		attachmentService.deleteAttachment(id, attachmentId);
+		return ResponseEntity.ok(new ApiResponse<>(true, "Attachment deleted", null));
+	}
+
+	// ── Helper ────────────────────────────────────────────────────
+
+	private String buildDownloadUrl(Long problemId, Long attachmentId) {
+		return ServletUriComponentsBuilder.fromCurrentContextPath()
+				.path("/api/problems/{problemId}/attachments/{attachmentId}/download")
+				.buildAndExpand(problemId, attachmentId)
+				.toUriString();
 	}
 }

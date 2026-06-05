@@ -10,7 +10,7 @@ const BASE = (import.meta.env.VITE_KB_SERVICE_URL || 'http://localhost:3000') + 
 
 const api = axios.create({ baseURL: BASE });
 api.interceptors.request.use(config => {
-  const t = tokenUtils.getToken()();
+  const t = tokenUtils.getToken();
   if (t) config.headers.Authorization = `Bearer ${t}`;
   return config;
 });

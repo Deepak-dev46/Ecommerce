@@ -10,6 +10,7 @@ import com.rvz.serviceeverz.dto.response.UserSummaryResponse;
 import com.rvz.serviceeverz.entity.Asset;
 import com.rvz.serviceeverz.entity.AssetMapping;
 import com.rvz.serviceeverz.entity.AssetNotificationLog;
+import com.rvz.serviceeverz.entity.BackupSchedule;
 import com.rvz.serviceeverz.enums.NotificationType;
 import com.rvz.serviceeverz.feign.MailServiceClient;
 import com.rvz.serviceeverz.feign.UserServiceClient;
@@ -95,6 +96,8 @@ public class AssetNotificationService {
 
 		logRepo.save(entry);
 	}
+
+	// ── Asset Mapping Notifications ───────────────────────────────────────────
 
 	public void notifySpMappingRequestReceived(AssetMapping m) {
 		send(m.getId(), NotificationType.MAPPING_REQUEST_RECEIVED_BY_SP, m.getAssignedBySpId(),
@@ -190,6 +193,77 @@ public class AssetNotificationService {
 								asset.getRentalRenewalOption() != null ? (asset.getRentalRenewalOption() ? "Yes" : "No")
 										: "—")));
 	}
+
+	// ── Backup Schedule Notifications ─────────────────────────────────────────
+
+	/**
+	 * Sent to the SP who created the schedule when a new backup schedule is saved.
+	 */
+	public void notifyBackupScheduled(BackupSchedule schedule, String spName, String assetName,
+			String policyName) {
+		send(null, NotificationType.BACKUP_SCHEDULED, schedule.getCreatedBySpId(),
+				"[Backup Scheduled] " + schedule.getScheduleName(),
+				buildHtml("Backup Schedule Created",
+						"A new backup schedule has been successfully created.",
+						row("Schedule Name", schedule.getScheduleName()),
+						row("Description", orDash(schedule.getDescription())),
+						row("Asset", orDash(assetName)),
+						row("Retention Policy", orDash(policyName)),
+						row("Frequency", schedule.getFrequency() != null ? schedule.getFrequency().name() : "—"),
+						row("Scheduled Date", schedule.getScheduledDate() != null ? schedule.getScheduledDate().toString() : "—"),
+						row("Created By", orDash(spName))));
+	}
+
+	/**
+	 * Sent to the SP when backup status changes to BACKUP_INITIATED.
+	 */
+	public void notifyBackupInitiated(BackupSchedule schedule, String spName, String assetName) {
+		send(null, NotificationType.BACKUP_INITIATED, schedule.getCreatedBySpId(),
+				"[Backup Initiated] " + schedule.getScheduleName(),
+				buildHtml("Backup Has Been Initiated",
+						"The backup process has started for the scheduled backup.",
+						row("Schedule Name", schedule.getScheduleName()),
+						row("Asset", orDash(assetName)),
+						row("Scheduled Date", schedule.getScheduledDate() != null ? schedule.getScheduledDate().toString() : "—"),
+						row("Next Backup Date", schedule.getNextBackupDate() != null ? schedule.getNextBackupDate().toString() : "—"),
+						row("Created By", orDash(spName))));
+	}
+
+	/**
+	 * Sent to the SP when backup status changes to BACKUP_COMPLETED.
+	 */
+	public void notifyBackupCompleted(BackupSchedule schedule, String spName, String assetName,
+			String policyName) {
+		send(null, NotificationType.BACKUP_COMPLETED, schedule.getCreatedBySpId(),
+				"[Backup Completed] " + schedule.getScheduleName(),
+				buildHtml("Backup Completed Successfully",
+						"The backup has been completed. The next backup date has been updated.",
+						row("Schedule Name", schedule.getScheduleName()),
+						row("Asset", orDash(assetName)),
+						row("Retention Policy", orDash(policyName)),
+						row("Frequency", schedule.getFrequency() != null ? schedule.getFrequency().name() : "—"),
+						row("Next Backup Date", schedule.getNextBackupDate() != null ? schedule.getNextBackupDate().toString() : "—"),
+						row("Created By", orDash(spName))));
+	}
+
+	/**
+	 * Sent to the SP when a backup's next date is within 10 days.
+	 */
+	public void notifyBackupUpcomingReminder(BackupSchedule schedule, String spName, String assetName,
+			int daysUntilBackup) {
+		send(null, NotificationType.BACKUP_UPCOMING_REMINDER, schedule.getCreatedBySpId(),
+				"[Backup Reminder] Upcoming backup in " + daysUntilBackup + " days — " + schedule.getScheduleName(),
+				buildHtml("Upcoming Backup Reminder",
+						"A scheduled backup is approaching. Please ensure all systems are ready.",
+						row("Schedule Name", schedule.getScheduleName()),
+						row("Asset", orDash(assetName)),
+						row("Next Backup Date", schedule.getNextBackupDate() != null ? schedule.getNextBackupDate().toString() : "—"),
+						row("Days Until Backup", String.valueOf(daysUntilBackup)),
+						row("Frequency", schedule.getFrequency() != null ? schedule.getFrequency().name() : "—"),
+						row("Created By", orDash(spName))));
+	}
+
+	// ── HTML Helpers ──────────────────────────────────────────────────────────
 
 	private String buildHtml(String title, String intro, String... rows) {
 		StringBuilder sb = new StringBuilder();

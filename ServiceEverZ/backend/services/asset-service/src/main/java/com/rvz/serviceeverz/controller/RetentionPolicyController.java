@@ -3,6 +3,7 @@ package com.rvz.serviceeverz.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/assets/data-management/retention-policies")
+@CrossOrigin
 public class RetentionPolicyController {
 
 	private final RetentionPolicyService retentionPolicyService;
@@ -59,6 +61,12 @@ public class RetentionPolicyController {
 	@GetMapping("/manager/{managerId}")
 	public ResponseEntity<List<RetentionPolicyResponse>> getByManager(@PathVariable Long managerId) {
 		return ResponseEntity.ok(retentionPolicyService.getPoliciesByManager(managerId));
+	}
+
+	// GET /api/assets/data-management/retention-policies/type/{type}
+	@GetMapping("/type/{type}")
+	public ResponseEntity<List<RetentionPolicyResponse>> getByType(@PathVariable String type) {
+		return ResponseEntity.ok(retentionPolicyService.getPoliciesByType(type));
 	}
 
 	// PUT /api/assets/data-management/retention-policies/{id}

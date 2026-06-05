@@ -7,7 +7,7 @@ export const changeApi = axios.create({
 });
 
 const attach = (config) => {
-  const t = tokenUtils.getToken()();
+  const t = tokenUtils.getToken();
   if (t) config.headers.Authorization = `Bearer ${t}`;
   return config;
 };

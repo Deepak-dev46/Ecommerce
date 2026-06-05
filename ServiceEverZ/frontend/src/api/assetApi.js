@@ -6,12 +6,14 @@ export const assetApi = axios.create({
 });
  
 const attach = (config) => {
-  const t = tokenUtils.getToken()();
+  if (!(config.data instanceof FormData)) {
+    config.headers["Content-Type"] = "application/json";
+  }
+  const t = tokenUtils.getToken();
   if (t) config.headers.Authorization = `Bearer ${t}`;
   return config;
 };
 const handle401 = (err) => {
-  // FIX: Redirect to '/' (root) on 401 — there is no '/login' route in this app.
   if (err.response?.status === 401) { tokenUtils.clearAll()(); window.location.href = '/'; }
   return Promise.reject(err);
 };
@@ -42,6 +44,65 @@ export const bulkImportAssets    = (file, spId)     => {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
+
+// ── Invoice Helpers ───────────────────────────────────────────────────────────
+// Converts a File object to a base64 string (without the data-URL prefix).
+// Used by AssetForm to embed the invoice directly in the AssetRequest payload.
+export const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]); // strip "data:...;base64,"
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+// Returns the URL that streams the stored invoice for an asset.
+// The backend sets Content-Disposition: inline so the browser renders it
+// inside an <iframe> / <embed> without opening a new tab.
+export const getInvoiceStreamUrl = (assetId) =>
+  `${assetApi.defaults.baseURL}/api/assets/${assetId}/invoice`;
+
+// Fetches the invoice as a blob (used for the Download button).
+export const downloadInvoiceBlob = (assetId) =>
+  assetApi.get(`/api/assets/${assetId}/invoice`, { responseType: 'blob' });
+
+// ── Specification Templates ───────────────────────────────────────────────────
+// GET /api/assets/spec-template/{category}
+// Returns { category, fields: { key: hint, ... } }
+export const getSpecTemplate = (category) =>
+  assetApi.get(`/api/assets/spec-template/${category}`);
+
+// GET /api/assets/spec-template  (all categories at once)
+export const getAllSpecTemplates = () =>
+  assetApi.get('/api/assets/spec-template');
+
+// ── Specification-based Search ────────────────────────────────────────────────
+// POST /api/assets/search/by-specs
+// Body: { specs: { key: value }, keyword?, category? }
+// Returns AVAILABLE assets matching all provided specs
+export const searchAssetsBySpecs = (specs, keyword, category) =>
+  assetApi.post('/api/assets/search/by-specs', {
+    specs: specs || {},
+    ...(keyword ? { keyword } : {}),
+    ...(category ? { category } : {}),
+  });
+
+// ── Ticket Fetching for Mapping ───────────────────────────────────────────────
+// GET /api/assets/tickets/hardware-inprogress/{spUserId}?keyword=
+// Returns IN_PROGRESS + Hardware tickets assigned to the SP
+export const getHardwareInProgressTickets = (spUserId, keyword) =>
+  assetApi.get(`/api/assets/tickets/hardware-inprogress/${spUserId}`, {
+    params: { ...(keyword ? { keyword } : {}) },
+  });
+
+// ── Bulk Import Template Download ─────────────────────────────────────────────
+// GET /api/assets/bulk-import/template?category=LAPTOP
+// Returns Excel file as blob
+export const downloadBulkImportTemplate = (category = 'LAPTOP') =>
+  assetApi.get('/api/assets/bulk-import/template', {
+    params: { category },
+    responseType: 'blob',
+  });
  
 // ── Asset Mappings ───────────────────────────────────────────────────────────
 export const createMapping          = (data)       => assetApi.post('/api/asset-mappings', data);
@@ -58,5 +119,3 @@ export const getPendingSpApprovals  = ()           => assetApi.get('/api/asset-m
 export const getPendingManagerApprovals = ()       => assetApi.get('/api/asset-mappings/pending/manager');
 export const getHistoryByAsset      = (assetId)    => assetApi.get(`/api/asset-mappings/history/asset/${assetId}`);
 export const getHistoryByUser       = (userId)     => assetApi.get(`/api/asset-mappings/history/user/${userId}`);
- 
- 

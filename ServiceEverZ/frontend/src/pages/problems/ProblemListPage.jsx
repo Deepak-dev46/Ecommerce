@@ -120,7 +120,7 @@ export default function ProblemListPage() {
       <Box sx={{ p: 2, pb: 0, flexShrink: 0}}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 , display:'flex', justifyContent:'space-between'}}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#27235C' }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#27235C' }}>
               Problem Management
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280' }}>
