@@ -1314,10 +1314,10 @@ function AssignPanel({ type }) {
                         textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         Name
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: '#9CA3AF',
+                      {/* <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: '#9CA3AF',
                         textTransform: 'uppercase', letterSpacing: '0.05em', width: 110, textAlign: 'center' }}>
                         Load
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: '#9CA3AF',
                         textTransform: 'uppercase', letterSpacing: '0.05em', width: 96, textAlign: 'center' }}>
                         Status
@@ -1355,12 +1355,12 @@ function AssignPanel({ type }) {
                                 </Typography>
                               </Stack>
                             </TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>
+                            {/* <TableCell sx={{ textAlign: 'center' }}>
                               <Stack alignItems="center" spacing={0.5}>
                                 <LoadChip count={cnt} />
                                 <LoadBar count={cnt} />
                               </Stack>
-                            </TableCell>
+                            </TableCell> */}
                             <TableCell sx={{ textAlign: 'center' }}>
                               <Chip
                                 label={cnt > 8 ? 'Busy' : 'Available'}

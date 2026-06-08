@@ -20,7 +20,7 @@ spring:
         - id: user-service-admin
           uri: lb://user-service
           predicates:
-            - Path=/api/v1/admin/users/**,/api/v1/admin/sla/**, /api/v1/admin/password-policy/**, /api/v1/reports/**, /api/v1/users/**, /api/v1/admin/locations/**
+            - Path=/api/v1/admin/users/**,/api/v1/admin/sla/**, /api/v1/admin/password-policy/**, /api/v1/reports/**, /api/v1/users/**, /api/v1/admin/locations/**, /api/v1/admin/org/**, /api/v1/admin/role-features/**
           filters:
             - StripPrefix=0
  

@@ -377,7 +377,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { incidentApi } from '../../api';
 import { Button } from '../../components/itsm/UI';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userApi } from '../../api/userApi';
 import toast from 'react-hot-toast';
@@ -640,6 +640,9 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
   const { user } = useAuth();
   const { state } = useLocation();
   const { category, subcategory } = state || {};
+
+  const location = useLocation();
+  const navigate = useNavigate();
  
   const [currentUser, setCurrentUser] = useState(null);
  
@@ -758,7 +761,9 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
       if (attachment?.raw) {
         formData.append('file', attachment.raw);
       }
- 
+      let path = location.pathname;
+      navigate(path.substring(0,path.indexOf('service'))+'/tickets')
+      
       const result = await incidentApi.createIncident(formData);
       toast.success('Incident reported successfully!');
       if (typeof onSuccess === 'function') onSuccess(result);

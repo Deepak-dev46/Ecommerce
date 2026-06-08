@@ -79,7 +79,7 @@ const ITSM_NAV = [
   { label: 'My tickets', icon: TicketIcon, path: '/itsm/Mytickets', featureKey: 'ITSM_TICKETS' },
   { label: 'Feedback', icon: FeedbackIcon, path: '/itsm/dashboard', featureKey: 'ITSM_FEEDBACK' },
   { label: 'All tickets', icon: TicketIcon, path: '/itsm/tickets', featureKey: 'ITSM_TICKETS' },
-  { label: 'Manual assign', icon: ApprovalIcon, path: '/itsm/assign', featureKey: 'ITSM_ASSIGN' },
+  { label: 'Assign Tickets', icon: ApprovalIcon, path: '/itsm/assign', featureKey: 'ITSM_ASSIGN' },
   { label: 'Monitor Tickets', icon: AssessmentIcon, path: '/itsm/monitor', featureKey: 'ITSM_MONITOR' },
   { label: 'Service catalog', icon: CatalogIcon, path: '/itsm/manage/service-catalog', featureKey: 'ITSM_CATALOG' },
   { label: 'Create request', icon: CreateIcon, path: '/itsm/service-catalog', featureKey: 'ITSM_CATALOG' },

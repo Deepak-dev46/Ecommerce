@@ -162,7 +162,7 @@ const Navbar = ({ onMenuToggle }) => {
         {/* Action Controls Segment */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2, sm: 3 } }}>
           
-          <Tooltip title="Notifications">
+          {/* <Tooltip title="Notifications">
             <IconButton 
               size="small" 
               sx={{ 
@@ -190,7 +190,7 @@ const Navbar = ({ onMenuToggle }) => {
                 <BellIcon fontSize="small" />
               </Badge>
             </IconButton>
-          </Tooltip>
+          </Tooltip> */}
  
           {/* <Tooltip title="Settings">
             <IconButton 
