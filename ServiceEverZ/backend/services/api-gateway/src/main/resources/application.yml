@@ -1,0 +1,242 @@
+server:
+  port: 8080
+ 
+spring:
+  application:
+    name: api-gateway
+ 
+  cloud:
+    gateway:
+      routes:
+        # ── AUTH SERVICE (NO JWT) ──────────────────────────────
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/v1/auth/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── USER SERVICE ADMIN (JWT REQUIRED) ──────────────────
+        - id: user-service-admin
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/admin/users/**,/api/v1/admin/sla/**, /api/v1/admin/password-policy/**, /api/v1/reports/**, /api/v1/users/**, /api/v1/admin/locations/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── CHANGE MANAGEMENT (JWT REQUIRED) ──────────────────
+        - id: change-management-service
+          uri: lb://change-management-service
+          predicates:
+            - Path=/api/change-management/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── ROLE SERVICE ADMIN (JWT REQUIRED) ──────────────────
+        - id: role-service-admin
+          uri: lb://role-service
+          predicates:
+            - Path=/api/v1/admin/roles/**, /api/v1/admin/user-roles/**, /api/v1/admin/role-permissions/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── RMO SERVICE (JWT REQUIRED) ─────────────────────────
+        - id: rmo-service
+          uri: lb://rmo-service
+          predicates:
+            - Path=/api/v1/rmo/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── USER SERVICE INTERNAL (NO JWT) ─────────────────────
+        - id: user-service-internal
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/internal/users/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── PROBLEM SERVICE INTERNAL (NO JWT) ─────────────────────
+        - id: problem-service
+          uri: lb://problem-service
+          predicates:
+            - Path=/api/problems/**, /api/problem-categories/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── TICKET SERVICE ─────────────────────────────────────
+        - id: ticket-service
+          uri: lb://ticket-service
+          predicates:
+            - Path=/api/tickets/**, /api/attachments/**, /api/comments/**, /api/history/**, /api/queue/**, /api/time-period/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── KNOWLEDGEBASE SERVICE ─────────────────────────────────────
+        - id: knowledge-base-service
+          uri: lb://knowledge-base-service
+          predicates:
+            - Path=/api/kb/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── ROLE SERVICE (NO JWT) ─────────────────────
+        - id: role-service-internal
+          uri: lb://role-service
+          predicates:
+            - Path=/api/v1/internal/roles/**, /api/v1/admin/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── SERVICE CATALOG ────────────────────────────────────
+        - id: service-catalog
+          uri: lb://service-catalog
+          predicates:
+            - Path=/api/service-catalog/**, /api/manager/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── CSAT PUBLIC (Team A) ────────────────────────────────
+        - id: csat-public
+          uri: lb://ticket-service
+          predicates:
+            - Path=/api/csat/**, /api/internal-notes/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── REPORT SERVICE (JWT REQUIRED) ──────────────────────
+        - id: report-service
+          uri: lb://report-service
+          predicates:
+            - Path=/api/reports/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── USER BY IDs (INTERNAL) ─────────────────────────────
+        - id: user-by-ids
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/internal/users/by-ids
+          filters:
+            - StripPrefix=0
+ 
+        # ── APPROVAL SERVICE (Team C) ───────────────────────────
+        - id: approval-service
+          uri: lb://approval-service
+          predicates:
+            - Path=/api/approvals/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── MASTER DATA SERVICE ─────────────────────────────────
+        - id: master-data-service
+          uri: lb://master-data-service
+          predicates:
+            - Path=/api/master/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── MAIL SERVICE ────────────────────────────────────────
+        - id: mail-service
+          uri: lb://mail-service
+          predicates:
+            - Path=/api/mail/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── ASSIGNMENT SERVICE ──────────────────────────────────
+        - id: assignment-service
+          uri: lb://assignment-service
+          predicates:
+            - Path=/api/assignments/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── SLA SERVICE ─────────────────────────────────────────
+        - id: sla-service
+          uri: lb://sla-service
+          predicates:
+            - Path=/api/sla/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── EMAIL SERVICE ─────────────────────────────────────────
+        - id: email-service
+          uri: lb://email-service
+          predicates:
+            - Path=/api/v1/email/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── EMAIL TICKET SERVICE ─────────────────────────────────────────
+        - id: email-ticket-service
+          uri: lb://email-ticket-service
+          predicates:
+            - Path=/api/email-tickets/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── ACTION SERVICE ──────────────────────────────────────
+        - id: action-service
+          uri: lb://action-service
+          predicates:
+            - Path=/api/actions/**, /api/auto-close/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── INCIDENT SERVICE ──────────────────────────────────────
+        - id: incident-service
+          uri: lb://incident-service
+          predicates:
+            - Path=/api/incidents/**
+          filters:
+            - StripPrefix=0
+ 
+        # ── ASSET SERVICE ──────────────────────────────────────
+        - id: asset-service
+          uri: lb://asset-service
+          predicates:
+            - Path=/api/assets/**, /api/asset-mappings/**
+          filters:
+            - StripPrefix=0
+ 
+      # ── GLOBAL CORS ──────────────────────────────────────────
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+ 
+# ── EUREKA ───────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+ 
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+ 
+# ── JWT ──────────────────────────────────────────────────
+jwt:
+  secret: ServiceEverZSecretKey2026@Chennai#Tamil$Nadu%Secure!Key&XYZ12345
+ 
+# ── ACTUATOR ─────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+ 

@@ -1,0 +1,5 @@
+"Ticket Id","Ticket Number","Subject","Status","Priority","Type Name","Category Name","Sub Category Name","Requester Name","Assignee Name","Sla Breached","Reopened Count","Response Time Minutes","Resolution Time Minutes","Created At","Updated At"
+"4","INC-1780571298309-199","Tools | Software | Atchaya Gomathi","OPEN","MEDIUM","","Tools","Software","Atchaya Gomathi","","false","","","","2026-06-04T11:08:18.311546","2026-06-04T11:08:18.311546"
+"3","INC-1780570615340-371","Tools | Software | Atchaya Gomathi","OPEN","MEDIUM","","Tools","Software","Atchaya Gomathi","","false","","","","2026-06-04T10:56:55.342401","2026-06-04T10:56:55.342401"
+"2","INC-1780570165233-853","Hardware | Tools | Atchaya Gomathi","IN_PROGRESS","MEDIUM","","Hardware","Tools","Atchaya Gomathi","","false","","","","2026-06-04T10:49:25.234862","2026-06-04T11:33:09.299036"
+"1","INC-1780570073747-565","Tools | Software | Atchaya Gomathi","CLOSED","MEDIUM","","Tools","Software","Atchaya Gomathi","","false","","","","2026-06-04T10:47:53.795561","2026-06-04T10:47:53.795561"

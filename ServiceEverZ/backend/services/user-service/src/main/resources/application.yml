@@ -1,0 +1,44 @@
+server:
+  port: 0
+ 
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/serviceeverz?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    database-platform: org.hibernate.dialect.MySQLDialect
+ 
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+    # Ensures the service registers by IP address and randomized instance IDs to Eureka
+    instance-id: ${spring.application.name}:${random.value}
+ 
+admin:
+  default:
+    email: ramadoss.selvaraj@relevantz.com
+    password: Admin@123
+    firstName: Ramdoss
+    lastName: Selvaraj
+    employeeId: 1001
+ 
+mail:
+  service:
+    url: http://localhost:8080
+ 

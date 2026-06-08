@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: auth-service-test
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: ServiceEverZSecretKey2026@Chennai#Tamil$Nadu%Secure!Key&XYZ12345
+  expiration: 86400000

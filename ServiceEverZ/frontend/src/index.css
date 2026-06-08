@@ -1,0 +1,15 @@
+src/index.css
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', 'Roboto', sans-serif;
+  background-color: #ffffff;
+  color: #1B193F;
+  -webkit-font-smoothing: antialiased;
+}
+#root { min-height: 100vh; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+ 
