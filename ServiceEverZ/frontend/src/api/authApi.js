@@ -10,11 +10,12 @@ export const authApi = {
   resetPassword: (data) => authAxios.post('/api/v1/auth/reset-password', data),
   resendOtp: (data) => authAxios.post('/api/v1/auth/resend-otp', data),
  
+ 
   saveLoginSession: (responseData) => {
-    alert(responseData.userId);
-    if (!responseData) return;
-    if (responseData.token) tokenUtils.setToken(responseData.token);
-    
+  if (!responseData) return;   // ← starts here, no alert
+  if (responseData.token) tokenUtils.setToken(responseData.token);
+  // ... rest unchanged
+   
  
     tokenUtils.setUser({
       userId:         responseData.userId,
@@ -38,4 +39,5 @@ export const authApi = {
 };
  
 export { tokenUtils };
+ 
  

@@ -657,7 +657,7 @@ export default function MyTicketsPage() {
 
                       {/* Category */}
                       <TableCell sx={{ fontSize: '0.8rem', color: '#374151', py: 1.5 }}>
-                        {t.category || t.categoryName || '—'}
+                        {t.category || t.categoryName || 'Network'}
                       </TableCell>
 
                       {/* L1 Approver */}
