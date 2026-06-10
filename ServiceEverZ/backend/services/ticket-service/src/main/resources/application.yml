@@ -6,7 +6,7 @@ spring:
     name: ticket-service
 
   datasource:
-    url: jdbc:mysql://localhost:3306/serviceeverz?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://mysql:3306/serviceeverz?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: root
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -41,18 +41,18 @@ sla:
     CRITICAL: 4
 
 # ── URLs to Team C's services (Feign fallback URLs if Eureka is down) ──
-their.user.service.url: http://localhost:8080
-master.service.url: http://localhost:8080
-approval.service.base-url: http://localhost:8080/api/approvals
-mail.service.base-url: http://localhost:8080/api/mail
-service.catalog.base-url: http://localhost:8080
-rmo.service.url: http://localhost:8080
+their.user.service.url: http://api-gateway:8080
+master.service.url: http://api-gateway:8080
+approval.service.base-url: http://api-gateway:8080/api/approvals
+mail.service.base-url: http://api-gateway:8080/api/mail
+service.catalog.base-url: http://api-gateway:8080
+rmo.service.url: http://api-gateway:8080
 
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://eureka-service:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:

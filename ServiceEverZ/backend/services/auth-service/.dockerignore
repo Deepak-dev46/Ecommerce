@@ -1,0 +1,10 @@
+target/
+.git/
+.idea/
+.vscode/
+*.log
+*.md
+.classpath
+.project
+.settings/
+*.zip

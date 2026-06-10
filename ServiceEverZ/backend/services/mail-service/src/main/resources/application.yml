@@ -7,8 +7,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: muthubro03@gmail.com
-    password: xcicowxteywbuysc
+    username: relevantz.servicedesk@gmail.com
+    password: hvcyefchhtpnqwbx
     test-connection: false
     properties:
       mail:
@@ -26,10 +26,9 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://eureka-service:8761/eureka/
   instance:
     prefer-ip-address: true
-    instance-id: ${spring.application.name}:${server.port}
  
 logging:
   level:

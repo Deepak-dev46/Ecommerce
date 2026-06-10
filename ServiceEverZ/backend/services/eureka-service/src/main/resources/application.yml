@@ -2,12 +2,10 @@ server:
   port: 8761
 eureka:
   instance:
-    hostname: localhost
+    hostname: eureka-service
   client:
     register-with-eureka: false
     fetch-registry: false
-    service-url:
-      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
   server:
     enable-self-preservation: false
 spring:
