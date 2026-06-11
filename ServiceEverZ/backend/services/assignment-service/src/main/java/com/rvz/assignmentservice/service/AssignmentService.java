@@ -1,12 +1,12 @@
 
 package com.rvz.assignmentservice.service;
 
+import java.util.List;
+import java.util.Map;
+
 import com.rvz.assignmentservice.dto.request.AcknowledgeRequest;
 import com.rvz.assignmentservice.dto.request.TriggerAssignmentRequest;
 import com.rvz.assignmentservice.dto.response.AssignmentResponse;
-
-import java.util.List;
-import java.util.Map;
 
 public interface AssignmentService {
     AssignmentResponse triggerAssignment(TriggerAssignmentRequest request);
@@ -25,4 +25,3 @@ public interface AssignmentService {
     // Returns assignments filtered by status (ASSIGNED / OPEN / REASSIGNED)
     List<AssignmentResponse> getAssignmentsByStatus(String status);
 }
-

@@ -50,7 +50,7 @@ import {
 } from '../../api/ticketApi';
 import TicketStatusChip from '../../components/common/TicketStatusChip';
 import { updateAllowUserReply } from '../../api/ticketApi';
-
+import { InputAdornment } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import DownloadIcon from '@mui/icons-material/Download';
 import ReplyAllIcon from '@mui/icons-material/ReplyAll';
@@ -683,6 +683,7 @@ function exportTicketCSV(ticket, comments, history) {
 }
 
 /* ─── Tabs Content ───────────────────────────────────────────── */
+ const MAX_CHARS = 100;
 function ConversationsTab({
   comments,
   ticket,
@@ -695,9 +696,35 @@ function ConversationsTab({
   onToggleUserReply
 }) {
   const canComment = COMMENT_ALLOWED.includes(ticket?.status);
-
+  const charCount = commentText.length;
+  const isEmpty = commentText.trim().length === 0;
+ 
+  const getCounterColor = () => {
+    if (charCount >= MAX_CHARS) return '#EF4444';
+    if (charCount >= MAX_CHARS * 0.8) return '#F59E0B';
+    return '#9CA3AF';
+  };
+ 
+  const getBorderColor = (isHover = false) => {
+    if (charCount >= MAX_CHARS) return '#EF4444';
+    if (charCount > 0) return isHover ? '#1A9A3C' : '#24A148';
+    return isHover ? '#D1D5DB' : '#E5E7EB';
+  };
+ 
+  const getHelperText = () => {
+    if (isEmpty) return 'Reply cannot be empty';
+    return '';
+  };
+ 
+  const getHelperColor = () => {
+    if (isEmpty) return '#9CA3AF';
+    if (charCount >= MAX_CHARS) return '#EF4444';
+    return '#24A148';
+  };
+ 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Comments List */}
       {comments.length === 0 ? (
         <EmptyState
           icon={<ChatBubbleOutlineIcon />}
@@ -707,17 +734,20 @@ function ConversationsTab({
       ) : (
         <Box
           sx={{
-            mb: 2.5, maxHeight: 460, overflowY: 'auto', pr: 1,
+            mb: 2.5,
+            maxHeight: 460,
+            overflowY: 'auto',
+            pr: 1,
             '&::-webkit-scrollbar': { width: 4 },
             '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
             '&::-webkit-scrollbar-thumb': { backgroundColor: '#E5E7EB', borderRadius: 4 },
           }}
         >
           {comments.map((c, i) => {
-            const isSupport = c.authRole === "SUPPORT_PERSONNEL";
+            const isSupport = c.authRole === 'SUPPORT_PERSONNEL';
             return (
               <CommentBubble
-                key={c.id || i}
+key={c.id || i}
                 comment={c}
                 isOwnMessage={isSupport}
               />
@@ -726,27 +756,45 @@ function ConversationsTab({
           <div ref={commentsEndRef} />
         </Box>
       )}
-
+ 
+      {/* Comment Input Section */}
       {canComment && (
         <>
           <Divider sx={{ mb: 2 }} />
+ 
+          {/* Allow User Reply Toggle */}
           <Stack
             direction="row"
             alignItems="center"
             justifyContent="space-between"
             sx={{
-              mb: 2, p: 1.5, borderRadius: '10px',
+              mb: 2,
+              p: 1.5,
+              borderRadius: '10px',
               backgroundColor: allowUserReply ? '#EDFAF2' : '#F8F8FC',
               border: `1px solid ${allowUserReply ? '#B7EAC9' : '#E5E7EB'}`,
             }}
           >
             <Stack direction="row" spacing={1} alignItems="center">
-              <ReplyAllIcon sx={{ fontSize: 18, color: allowUserReply ? '#24A148' : '#9CA3AF' }} />
+              <ReplyAllIcon
+                sx={{ fontSize: 18, color: allowUserReply ? '#24A148' : '#9CA3AF' }}
+              />
               <Box>
-                <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: allowUserReply ? '#1A5C34' : '#374151' }}>
+                <Typography
+                  sx={{
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: allowUserReply ? '#1A5C34' : '#374151',
+                  }}
+                >
                   Allow End-User Reply
                 </Typography>
-                <Typography sx={{ fontSize: '0.72rem', color: allowUserReply ? '#24A148' : '#9CA3AF' }}>
+                <Typography
+                  sx={{
+                    fontSize: '0.72rem',
+                    color: allowUserReply ? '#24A148' : '#9CA3AF',
+                  }}
+                >
                   {allowUserReply ? 'User can reply to this ticket' : 'User reply is disabled'}
                 </Typography>
               </Box>
@@ -757,42 +805,98 @@ function ConversationsTab({
               size="small"
               sx={{
                 '& .MuiSwitch-switchBase.Mui-checked': { color: '#24A148' },
-                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#24A148' },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                  backgroundColor: '#24A148',
+                },
               }}
             />
           </Stack>
-
+ 
+          {/* Text Input */}
           <Stack spacing={1.5}>
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>
               Add Reply / Note
             </Typography>
+ 
             <TextField
-              multiline minRows={3} maxRows={8}
+              multiline
+              minRows={3}
+              maxRows={8}
               placeholder="Type your reply or internal note here..."
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              fullWidth variant="outlined"
-              helperText={commentText.trim().length > 0 ? `${commentText.trim().length} characters` : 'Reply cannot be empty'}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_CHARS) {
+                  setCommentText(e.target.value);
+                }
+              }}
+              fullWidth
+              variant="outlined"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment
+                    position="end"
+                    sx={{ alignSelf: 'flex-end', mb: 1.2, mr: 0.5 }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: getCounterColor(),
+                        transition: 'color 0.2s ease',
+                      }}
+                    >
+                      {charCount}/{MAX_CHARS}
+                    </Typography>
+                  </InputAdornment>
+                ),
+              }}
+              helperText={getHelperText()}
               FormHelperTextProps={{
-                sx: { fontSize: '0.74rem', color: commentText.trim().length > 0 ? '#24A148' : '#9CA3AF', mt: 0.5 },
+                sx: {
+                  fontSize: '0.74rem',
+                  color: getHelperColor(),
+                  mt: 0.5,
+                },
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: '10px', fontSize: '0.87rem',
-                  '& fieldset': { borderColor: commentText.trim().length > 0 ? '#24A148' : '#E5E7EB' },
-                  '&:hover fieldset': { borderColor: commentText.trim().length > 0 ? '#24A148' : '#D1D5DB' },
+                  borderRadius: '10px',
+                  fontSize: '0.87rem',
+                  alignItems: 'flex-start',
+                  '& fieldset': {
+                    borderColor: getBorderColor(),
+                    transition: 'border-color 0.2s ease',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: getBorderColor(true),
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: charCount >= MAX_CHARS ? '#EF4444' : '#24A148',
+                  },
                 },
               }}
             />
+ 
+            {/* Send Button */}
             <Stack direction="row" justifyContent="flex-end" spacing={1}>
               <Button
                 variant="contained"
-                endIcon={submitting ? <CircularProgress size={13} color="inherit" /> : <SendIcon />}
+                endIcon={
+                  submitting
+                    ? <CircularProgress size={13} color="inherit" />
+                    : <SendIcon />
+                }
                 onClick={onAddComment}
-                disabled={submitting || !commentText.trim()}
+                disabled={submitting || isEmpty || charCount >= MAX_CHARS}
                 sx={{
-                  backgroundColor: '#27235C', borderRadius: '8px', fontSize: '0.82rem',
+                  backgroundColor: '#27235C',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
                   '&:hover': { backgroundColor: '#1B193F' },
+                  '&.Mui-disabled': {
+                    backgroundColor: '#E5E7EB',
+                    color: '#9CA3AF',
+                  },
                 }}
               >
                 {submitting ? 'Sending…' : 'Send Reply'}

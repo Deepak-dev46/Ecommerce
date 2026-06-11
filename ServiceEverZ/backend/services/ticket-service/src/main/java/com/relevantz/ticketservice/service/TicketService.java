@@ -50,8 +50,7 @@ public class TicketService {
 	private final TicketItemTimePeriodRepository timePeriodRepository;
 	private final com.relevantz.ticketservice.client.ApprovalClient approvalClient;
 	private final TicketRelationshipService relationshipService;
-    private final TicketAccessPeriodRepository accessPeriodRepo;
-
+	private final TicketAccessPeriodRepository accessPeriodRepo;
 
 	@Value("${sla.hours.LOW:72}")
 	private int slaLow;
@@ -77,7 +76,7 @@ public class TicketService {
 		this.timePeriodRepository = timePeriodRepository;
 		this.approvalClient = approvalClient;
 		this.relationshipService = relationshipService;
-	    this.accessPeriodRepo = accessPeriodRepo;
+		this.accessPeriodRepo = accessPeriodRepo;
 	}
 
 	/*
@@ -121,7 +120,7 @@ public class TicketService {
 		} catch (Exception e) {
 			// FIX 3: Always log detection failures
 			System.err.println("[WARN] Duplicate detection failed for ticket "
-				+ saved.getTicketId() + ": " + e.getMessage());
+					+ saved.getTicketId() + ": " + e.getMessage());
 		}
 
 		recordHistory(saved, TicketStatus.OPEN, "Ticket created");
@@ -149,13 +148,14 @@ public class TicketService {
 			approvalResponse = ApprovalResponse.fromMap(apiResp);
 		} catch (Exception e) {
 			// approval-service may not have a record yet (draft tickets) — safe to ignore
-			System.out.println("No approval record for ticket " + ticketId + ": " + e.getMessage());
+			System.err.println("No approval record for ticket " + ticketId + ": " + e.getMessage());
 		}
-		TicketResponse response = TicketResponse.from(ticket, attachments, comments, queue, List.of(), timePeriod, approvalResponse);
- 
-        accessPeriodRepo.findByTicketId(ticketId)
-        .ifPresent(ap -> response.setAccessRequiredTill(ap.getAccessRequiredTill()));
-        return response;
+		TicketResponse response = TicketResponse.from(ticket, attachments, comments, queue, List.of(), timePeriod,
+				approvalResponse);
+
+		accessPeriodRepo.findByTicketId(ticketId)
+				.ifPresent(ap -> response.setAccessRequiredTill(ap.getAccessRequiredTill()));
+		return response;
 	}
 
 	public List<TicketResponse> getDraftsByUser(Long userId) {
@@ -169,15 +169,14 @@ public class TicketService {
 	 */
 	public CommentResponse addComment(Long ticketId, AddCommentRequest req) {
 
-		 Ticket ticket=findTicketOrThrow(ticketId);
-		
+		Ticket ticket = findTicketOrThrow(ticketId);
+
 		if ("END_USER".equalsIgnoreCase(req.getAuthorRole())
-	            && !ticket.isAllowUserReply()) {
-	 
-	        throw new BadRequestException(
-	                "User replies are disabled for this ticket"
-	        );
-	    }
+				&& !ticket.isAllowUserReply()) {
+
+			throw new BadRequestException(
+					"User replies are disabled for this ticket");
+		}
 
 		TicketComment comment = new TicketComment();
 		comment.setTicketId(ticketId);
@@ -185,21 +184,21 @@ public class TicketService {
 		comment.setComment(req.getBody());
 		comment.setCreatedBy(req.getAuthorId());
 		comment.setAuthorName(req.getAuthorName());
-		System.out.println(req.getAuthorName());
+		System.err.println(req.getAuthorName());
 		comment.setAuthorRole(req.getAuthorRole());
-		System.out.println(req.getAuthorRole());
+		System.err.println(req.getAuthorRole());
 		comment.setChannel(req.getChannel());
 		return CommentResponse.from(commentRepository.save(comment));
 	}
 
 	public List<CommentResponse> getCommentsByChannel(Long ticketId, String channel) {
-	    return commentRepository
-	            .findByTicketIdAndChannelOrderByCreatedAtAsc(ticketId, channel)
-	            .stream()
-	            .map(CommentResponse::from)
-	            .toList();
+		return commentRepository
+				.findByTicketIdAndChannelOrderByCreatedAtAsc(ticketId, channel)
+				.stream()
+				.map(CommentResponse::from)
+				.toList();
 	}
-	 
+
 	public List<CommentResponse> getComments(Long ticketId) {
 		return commentRepository.findByTicketIdOrderByCreatedAtAsc(ticketId).stream().map(CommentResponse::from)
 				.toList();
@@ -232,14 +231,14 @@ public class TicketService {
 		LocalDateTime now = LocalDateTime.now();
 
 		// ✅ FIX 1: Safe response time calculation
-		if (next == TicketStatus.IN_PROGRESS && ticket.getResponseTimeMinutes() == null) {
+		if (next == TicketStatus.IN_PROGRESS) {
 
 			if (ticket.getSlaStartTime() != null) {
 				long min = java.time.Duration.between(ticket.getSlaStartTime(), now).toMinutes();
 
 				ticket.setResponseTimeMinutes(min);
 			} else {
-				System.out.println("⚠ SLA Start Time NULL (IN_PROGRESS) for ticket: " + ticket.getTicketId());
+				System.err.println("⚠ SLA Start Time NULL (IN_PROGRESS) for ticket: " + ticket.getTicketId());
 			}
 		}
 
@@ -252,9 +251,9 @@ public class TicketService {
 				long min = java.time.Duration.between(ticket.getSlaStartTime(), now).toMinutes();
 
 				ticket.setResolutionTimeMinutes(min);
-				
+
 			} else {
-				System.out.println("⚠ SLA Start Time NULL (CLOSED/RESOLVED) for ticket: " + ticket.getTicketId());
+				System.err.println("⚠ SLA Start Time NULL (CLOSED/RESOLVED) for ticket: " + ticket.getTicketId());
 			}
 		}
 
@@ -267,9 +266,9 @@ public class TicketService {
 
 		recordHistory(saved, next, "Status changed to " + next, req.getChangedById(), req.getChangedBy());
 		if (next == TicketStatus.RESOLVED || next == TicketStatus.CLOSED) {
-            relationshipService.propagateDependencyResolution(saved.getTicketId());
-            relationshipService.autoCloseParentIfAllChildrenResolved(saved.getTicketId());
-        }
+			relationshipService.propagateDependencyResolution(saved.getTicketId());
+			relationshipService.autoCloseParentIfAllChildrenResolved(saved.getTicketId());
+		}
 		return TicketResponse.from(saved, List.of(), List.of(), List.of(), List.of(), null);
 	}
 
@@ -280,8 +279,8 @@ public class TicketService {
 	public TicketResponse reopenTicket(Long id, ReopenTicketRequest req) {
 
 		Ticket t = findTicketOrThrow(id);
-		
-// Guard: CLOSED tickets are final and can never be reopened
+
+		// Guard: CLOSED tickets are final and can never be reopened
 		if (t.getStatus() == TicketStatus.CLOSED) {
 			throw new BadRequestException("Ticket is CLOSED and cannot be reopened.");
 		}
@@ -319,7 +318,17 @@ public class TicketService {
 			ticket.setStatus(TicketStatus.IN_PROGRESS);
 		}
 
-		return TicketResponse.from(ticketRepository.save(ticket), List.of(), List.of(), List.of(), List.of(), null);
+		Ticket saved = ticketRepository.save(ticket);
+
+		// ✅ FIX: Record history for assignment / status change to IN_PROGRESS
+		recordHistory(saved, saved.getStatus(),
+				"Ticket assigned to " + (name != null ? name : "agent") + " — status updated to " + saved.getStatus(),
+				assigneeId, name);
+		System.err.println(assigneeId);
+		System.err.println(name);
+		System.err.println(saved.getStatus());
+
+		return TicketResponse.from(saved, List.of(), List.of(), List.of(), List.of(), null);
 	}
 
 	/*
@@ -334,7 +343,7 @@ public class TicketService {
 
 			return new SlaResponse(t.getPriority().name(), t.getSlaDeadline(), seconds, seconds < 0);
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
+			System.err.println(e.getMessage());
 			return null;
 		}
 	}
@@ -350,9 +359,9 @@ public class TicketService {
 
 	private int slaHoursFor(Priority p) {
 		return switch (p) {
-		case LOW -> slaLow;
-		case MEDIUM -> slaMedium;
-		case HIGH -> slaHigh;
+			case LOW -> slaLow;
+			case MEDIUM -> slaMedium;
+			case HIGH -> slaHigh;
 		};
 	}
 
@@ -519,17 +528,17 @@ public class TicketService {
 
 		return TicketResponse.from(saved, List.of(), List.of(), List.of(), List.of(), null);
 	}
-	
-	//toggle on 
+
+	// toggle on
 	public boolean updateAllowUserReply(Long id, Boolean allow) {
-		 
-	    Ticket ticket = findTicketOrThrow(id);
-	 
-	    ticket.setAllowUserReply(allow);
-	 
-	    ticketRepository.save(ticket);
-	 
-	    return ticket.isAllowUserReply();
+
+		Ticket ticket = findTicketOrThrow(id);
+
+		ticket.setAllowUserReply(allow);
+
+		ticketRepository.save(ticket);
+
+		return ticket.isAllowUserReply();
 	}
 
 	public boolean allowUserReply(Long id) {

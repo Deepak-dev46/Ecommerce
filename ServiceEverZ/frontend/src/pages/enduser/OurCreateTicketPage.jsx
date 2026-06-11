@@ -1568,6 +1568,30 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
 
     };
 
+    // ── Restore draft attachment from DB when editing a draft ──────────────
+// useEffect(() => {
+//     if (!isDraft || !draftTicket?.ticketId) return;
+ 
+//     ticketApi.getAttachments(draftTicket.ticketId)
+//         .then(attachments => {
+//             const list = Array.isArray(attachments) ? attachments : [];
+//             if (list.length > 0) {
+//                 const a = list[0]; // take the most recent attachment
+//                 // Restore as an attachment object the Uploader can display
+//                 set('attachment', {
+//                     name: a.filename,
+//                     size: a.fileSizeBytes || 0,
+//                     type: a.mimeType || '',
+//                     base64: a.file,         // base64 from DB — used if user saves again without re-uploading
+//                 });
+//             }
+//         })
+//         .catch(err => console.warn('Could not load draft attachment:', err));
+ 
+//     // eslint-disable-next-line
+// }, [isDraft, draftTicket?.ticketId]);
+ 
+
 
     const validateSubmit = () => {
 

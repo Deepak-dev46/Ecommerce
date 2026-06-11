@@ -78,6 +78,7 @@ export const ticketApi = {
   getByUser: (userId) => gatewayClient.get('/api/tickets/user-tickets', { params: { userId } }).then(uw),
   getById: (id) => gatewayClient.get(`/api/tickets/${id}`).then(raw),
   getMyTickets: (userId) => gatewayClient.get('/api/tickets/my', { params: { userId } }).then(raw),
+  getAttachments: (ticketId) => gatewayClient.get(`/api/attachments/ticket/${ticketId}`).then(raw), // ← ADD
   // NEW: load conversation/comments for L1 & L2 modal view
   getComments: (ticketId) => gatewayClient.get(`/api/tickets/${ticketId}/comments`).then(raw),
   getCommentsByChannel: (ticketId, channel) =>

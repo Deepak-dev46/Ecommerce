@@ -34,7 +34,8 @@ public interface OurTicketService {
 
     List<TicketResponse> getTicketsByUser(Long userId);
 
-    TicketResponse resolveTicket(Long ticketId, String resolutionMessage, Long supportPersonId);
+    // ✅ FIX: Added supportPersonName parameter so history records real agent name
+    TicketResponse resolveTicket(Long ticketId, String resolutionMessage, Long supportPersonId, String supportPersonName);
 
     TicketResponse userAcknowledge(Long ticketId, Long userId);
 
