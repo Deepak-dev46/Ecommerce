@@ -336,7 +336,7 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
   const [attachment, setAttachment] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-
+  const [breachUserSearch, setBreachUserSearch] = useState('');
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => { const n = { ...e }; delete n[k]; return n; });
