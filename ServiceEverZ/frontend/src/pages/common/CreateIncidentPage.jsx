@@ -1,387 +1,12 @@
-// import React, { useState, useRef, useEffect } from 'react';
-// import { incidentApi } from '../../api'
-// import { Button, Spinner } from '../../components/itsm/UI';
-// import { useLocation } from 'react-router-dom';
-// import { useAuth } from '../../context/AuthContext';
-// import { tokenUtils } from '../../utils/tokenUtils';
-// import { userApi } from '../../api/userApi';
-// import { toast } from 'react-toastify';
-
-// /* ─────────────────────────────────────────────────────────────────────────────
-//    RTE  — identical to CreateTicketPage
-// ───────────────────────────────────────────────────────────────────────────── */
-// function RTE({ value, onChange, error, placeholder }) {
-//   const ref = useRef(null);
-//   const initialized = useRef(false);
-
-//   useEffect(() => {
-//     if (ref.current && !initialized.current) {
-//       ref.current.innerHTML = value || '';
-//       initialized.current = true;
-//     }
-//     // eslint-disable-next-line
-//   }, []);
-
-//   const exec = (cmd, val) => {
-//     ref.current?.focus();
-//     document.execCommand(cmd, false, val ?? null);
-//     onChange(ref.current?.innerHTML || '');
-//   };
-
-//   return (
-//     <div>
-//       <div className={`rte-wrapper${error ? ' error' : ''}`}>
-//         <div className="rte-toolbar">
-//           {[['B', 'bold', 'bold'], ['I', 'italic', 'italic'], ['U', 'underline', 'underline']].map(([l, c, cls]) => (
-//             <button key={c} type="button" className={`rte-btn ${cls}`}
-//               onMouseDown={e => { e.preventDefault(); exec(c); }}>{l}</button>
-//           ))}
-//           <div className="rte-divider" />
-//           <button type="button" className="rte-btn"
-//             onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList'); }}>Bullet List</button>
-//           <button type="button" className="rte-btn"
-//             onMouseDown={e => { e.preventDefault(); exec('insertOrderedList'); }}>Numbered List</button>
-//           <button type="button" className="rte-btn link"
-//             onMouseDown={e => { e.preventDefault(); const u = window.prompt('Enter URL:'); if (u) exec('createLink', u); }}>Link</button>
-//           <div className="rte-divider" />
-//           <button type="button" className="rte-btn"
-//             style={{ color: 'var(--gray-5)', fontSize: 11 }}
-//             onMouseDown={e => { e.preventDefault(); exec('removeFormat'); }}>Clear</button>
-//         </div>
-//         <div ref={ref} className="rte-body" contentEditable suppressContentEditableWarning
-//           data-placeholder={placeholder || 'Describe the incident in detail...'}
-//           onInput={() => onChange(ref.current?.innerHTML || '')}
-//           style={{ minHeight: 140 }} />
-//       </div>
-//       {error && <div className="form-error">{error}</div>}
-//     </div>
-//   );
-// }
-
-// /* ─────────────────────────────────────────────────────────────────────────────
-//    UPLOADER  — identical to CreateTicketPage
-// ───────────────────────────────────────────────────────────────────────────── */
-// function Uploader({ value, onChange }) {
-//   const [err, setErr] = useState('');
-//   const [drag, setDrag] = useState(false);
-//   const ref = useRef(null);
-//   const EXTS = ['.jpg', '.jpeg', '.png', '.pdf', '.docx'];
-//   const MAX = 30 * 1024 * 1024;
-
-//   const handle = (file) => {
-//     if (!file) return;
-//     const ext = '.' + file.name.split('.').pop().toLowerCase();
-//     if (!EXTS.includes(ext)) { setErr(`Invalid: ${EXTS.join(', ')}`); return; }
-//     if (file.size > MAX) { setErr('Max 30 MB'); return; }
-//     setErr('');
-//     onChange({ name: file.name, size: file.size, file });
-//   };
-
-//   return (
-//     <div className="form-group">
-//       <label className="form-label">Attachments</label>
-//       <div
-//         className={`file-uploader${drag ? ' dragging' : ''}`}
-//         onClick={() => ref.current?.click()}
-//         onDragOver={e => { e.preventDefault(); setDrag(true); }}
-//         onDragLeave={() => setDrag(false)}
-//         onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]); }}
-//       >
-//         <input ref={ref} type="file" accept={EXTS.join(',')}
-//           style={{ display: 'none' }} onChange={e => handle(e.target.files[0])} />
-//         <div className="file-uploader__icon">+</div>
-//         {value
-//           ? <>
-//             <div className="file-uploader__selected">{value.name}</div>
-//             <div className="file-uploader__sub">{(value.size / 1024 / 1024).toFixed(2)} MB</div>
-//           </>
-//           : <>
-//             <div className="file-uploader__text">Drop file here or click to browse</div>
-//             <div className="file-uploader__sub">Allowed: {EXTS.join(', ')} — Max 30 MB</div>
-//           </>}
-//       </div>
-//       {err && <div className="form-error">{err}</div>}
-//     </div>
-//   );
-// }
-
-// /* ─────────────────────────────────────────────────────────────────────────────
-//    MAIN PAGE
-//    ───────────────────────────────────────────────────────────────────────────── */
-// export default function CreateIncidentPage({
-//   preSelected,   // { category, subCategory, ticketType }
-//   onSuccess,
-//   showSnack,
-//   onBack
-// }) {
-
-//   const {user} = useAuth();
-//   const [currentUser,setCurrentUser]= useState();
-
-//   // const [me,setMe] = useState();
-//   useEffect(() => {
-//     let loadUser=async()=>{
-//       let res=await userApi.getUserById(user.userId);
-//       // console.log(res);
-//       setCurrentUser(res.data);
-//     }
-//     loadUser()
-//   }, [])
-
-//   const { state } = useLocation();
-//   const { serviceType, category, subcategory } = state || {};
-//   const userName = currentUser?.fullName ||
-//     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || '';
-//   const userEmail = currentUser?.email || '';
-
-//   const autoSubject = `${category?.name || ''} | ${subcategory?.name || ''} | ${userName}`;
-
-//   const [form, setForm] = useState({
-//     description: '',
-//     priority: '',
-//     source: '',
-//     occurredAt: '',
-//     breachByUser: '',
-//     incidentLocation: '',
-//     officeLocation: '',
-//   });
-//   const [attachment, setAttachment] = useState(null);
-//   const [errors, setErrors] = useState({});
-//   const [loading, setLoading] = useState(false);
-//   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-//   const validate = () => {
-//     const e = {};
-//     if (!form.description.trim() || form.description === '<br>')
-//       e.description = 'Description is required';
-//     if (!form.priority)
-//       e.priority = 'Priority is required';
-//     if (!form.source)
-//       e.source = 'Source is required';
-//     return e;
-//   };
-
-    
-
-
-//   const handleSubmit = async () => {
-//     const e = validate();
-//     if (Object.keys(e).length) { setErrors(e); return; }
-//     setLoading(true);
-//     try {
-//       const payload = {
-//         userId: currentUser?.id,
-//         requesterName: userName,
-//         email: userEmail,
-//         categoryId: category?.id,
-//         subCategoryId: subcategory?.id,
-//         categoryName: category?.name,
-//         subCategoryName: subcategory?.name,
-//         subject: autoSubject,
-//         description: form.description,
-//         priority: form.priority,
-//         source: form.source,
-//         breachByUser: form.breachByUser || null,
-//         occurredAt: form.occurredAt || null,
-//         incidentLocation: form.incidentLocation || null,
-//         officeLocation: form.officeLocation || null,
-//         attachmentPath: attachment?.name || null,
-//       };
-      
-//       const result = await incidentApi.createIncident(payload);
-//       // showSnack('Incident reported successfully!', 'success'); 
-//       // onSuccess(result);
-//       toast.success('Incident reported successfully!');
-//     } catch (err) {
-//       console.log(err);
-      
-//       // showSnack(err.message || 'Failed to submit incident', 'error');
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <div>
-
-//       {/* ── Page Header ── */}
-//       <div className="page-header">
-//         <div className="page-header__breadcrumb">
-//           <span onClick={onBack} style={{ cursor: 'pointer' }}>Service Catalog</span>
-//           <span className="sep"> › </span>
-//           <span>{category?.name}</span>
-//           <span className="sep"> › </span>
-//           <span>{subcategory?.name}</span>
-//         </div>
-//         <div className="page-header__title">
-//           {category?.name} — {subcategory?.name}
-//         </div>
-//       </div>
-
-//       <div className="card">
-
-//         {/* ── Category + Sub Category (read-only) ── */}
-//         <div className="two-col" style={{ marginBottom: 'var(--space-4)' }}>
-//           <div>
-//             <div className="form-label">Category <span className="required">*</span></div>
-//             <div className="readonly-field">{category?.name || '—'}</div>
-//           </div>
-//           <div>
-//             <div className="form-label">Sub Category <span className="required">*</span></div>
-//             <div className="readonly-field">{subcategory?.name || '—'}</div>
-//           </div>
-//         </div>
-
-//         {/* ── Requester Details ── */}
-//         <div className="section-title">Requester Details</div>
-//         <div className="two-col" style={{ marginBottom: 'var(--space-4)' }}>
-//           <div>
-//             <div className="form-label">Requester Name <span className="required">*</span></div>
-//             <div className="readonly-field">{userName || '—'}</div>
-//           </div>
-//           <div>
-//             <div className="form-label">Employee ID</div>
-//             <div className="readonly-field">{currentUser?.employeeId || '—'}</div>
-//           </div>
-//         </div>
-//         <div style={{ marginBottom: 'var(--space-4)', fontSize: 13, color: 'var(--gray-5)' }}>
-//           Mode: Web Form
-//         </div>
-
-//         {/* ── Ticket Details ── */}
-//         <div className="section-title">Ticket Details</div>
-
-//         {/* Subject (auto-generated, read-only) */}
-//         <div className="form-group">
-//           <div className="form-label">Subject <span className="required">*</span></div>
-//           <div className="readonly-field" style={{ color: 'var(--gray-7)' }}>
-//             {autoSubject || 'Auto-generated'}
-//           </div>
-//         </div>
-
-//         {/* Description (RTE) */}
-//         <div className="form-group">
-//           <label className="form-label">Description <span className="required">*</span></label>
-//           <RTE
-//             value={form.description}
-//             onChange={v => set('description', v)}
-//             error={errors.description}
-//             placeholder="Describe your request..."
-//           />
-//         </div>
-
-//         {/* Priority + Source */}
-//         <div className="two-col">
-//           <div className="form-group">
-//             <label className="form-label">Priority <span className="required">*</span></label>
-//             <select
-//               className={`form-control${errors.priority ? ' error' : ''}`}
-//               value={form.priority}
-//               onChange={e => set('priority', e.target.value)}
-//             >
-//               <option value="" disabled>— Select Priority —</option>
-//               <option value="High">High</option>
-//               <option value="Medium">Medium</option>
-//               <option value="Low">Low</option>
-//             </select>
-//             {errors.priority && <div className="form-error">{errors.priority}</div>}
-//           </div>
-
-//           <div className="form-group">
-//             <label className="form-label">Source <span className="required">*</span></label>
-//             <select
-//               className={`form-control${errors.source ? ' error' : ''}`}
-//               value={form.source}
-//               onChange={e => set('source', e.target.value)}
-//             >
-//               <option value="" disabled>— Select Source —</option>
-//               <option value="Internal">Internal</option>
-//               <option value="External">External</option>
-//             </select>
-//             {errors.source && <div className="form-error">{errors.source}</div>}
-//           </div>
-//         </div>
-
-//         {/* Occurred At + Breach By User */}
-//         <div className="two-col">
-//           <div className="form-group">
-//             <label className="form-label">Occurred At (Date &amp; Time)</label>
-//             <input
-//               type="datetime-local"
-//               className="form-control"
-//               value={form.occurredAt}
-//               onChange={e => set('occurredAt', e.target.value)}
-//             />
-//           </div>
-
-//           <div className="form-group">
-//             <label className="form-label">Breach By User</label>
-//             <input
-//               className="form-control"
-//               value={form.breachByUser}
-//               onChange={e => set('breachByUser', e.target.value)}
-//               placeholder="Name or ID of the user"
-//             />
-//           </div>
-//         </div>
-
-//         {/* Incident Location + Office Location */}
-//         <div className="two-col">
-//           <div className="form-group">
-//             <label className="form-label">Incident Location</label>
-//             <input
-//               className="form-control"
-//               value={form.incidentLocation}
-//               onChange={e => set('incidentLocation', e.target.value)}
-//               placeholder="e.g. Floor 3, Server Room"
-//             />
-//           </div>
-
-//           <div className="form-group">
-//             <label className="form-label">Office Location</label>
-//             <input
-//               className="form-control"
-//               value={form.officeLocation}
-//               onChange={e => set('officeLocation', e.target.value)}
-//               placeholder="e.g. HQ, Branch A"
-//             />
-//           </div>
-//         </div>
-
-//         {/* Attachments */}
-//         <Uploader value={attachment} onChange={setAttachment} />
-
-//         {/* ── Actions ── */}
-//         <div className="divider" />
-//         <div className="flex-end flex-gap-3">
-//           <Button variant="ghost" onClick={onBack} disabled={loading}>
-//             Cancel
-//           </Button>
-//           <Button
-//             variant="primary"
-//             onClick={handleSubmit}
-//             loading={loading}
-//             disabled={loading}
-//           >
-//             Submit Incident
-//           </Button>
-//         </div>
-
-//       </div>{/* /card */}
-//     </div>
-//   );
-// }
-
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { incidentApi } from '../../api';
 import { Button } from '../../components/itsm/UI';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userApi } from '../../api/userApi';
+import { getAllLocations } from '../../api/LocationApi';
 import toast from 'react-hot-toast';
- 
+
 /* ── Inline styles — mirrors CreateTicketPage ct-* system ────────────────── */
 const styles = `
   .ci-form-grid {
@@ -495,7 +120,7 @@ const styles = `
     text-align: left;
   }
 `;
- 
+
 /* ── StyleInjector ───────────────────────────────────────────────────────── */
 function StyleInjector() {
   useEffect(() => {
@@ -507,7 +132,7 @@ function StyleInjector() {
   }, []);
   return null;
 }
- 
+
 /* ── Field wrapper — identical pattern to CreateTicketPage ──────────────── */
 function Field({ label, required, error, children, className = '' }) {
   return (
@@ -522,12 +147,12 @@ function Field({ label, required, error, children, className = '' }) {
     </div>
   );
 }
- 
+
 /* ── Rich Text Editor ────────────────────────────────────────────────────── */
 function RTE({ value, onChange, error, placeholder }) {
   const ref = useRef(null);
   const initialized = useRef(false);
- 
+
   useEffect(() => {
     if (ref.current && !initialized.current) {
       ref.current.innerHTML = value || '';
@@ -535,13 +160,13 @@ function RTE({ value, onChange, error, placeholder }) {
     }
     // eslint-disable-next-line
   }, []);
- 
+
   const exec = (cmd, val) => {
     ref.current?.focus();
     document.execCommand(cmd, false, val ?? null);
     onChange(ref.current?.innerHTML || '');
   };
- 
+
   return (
     <div style={{ overflow: 'auto', width: '100%', height: '110px' }}>
       <div className={`rte-wrapper${error ? ' error' : ''}`}>
@@ -576,7 +201,7 @@ function RTE({ value, onChange, error, placeholder }) {
     </div>
   );
 }
- 
+
 /* ── File Uploader ───────────────────────────────────────────────────────── */
 function Uploader({ value, onChange }) {
   const [err, setErr] = useState('');
@@ -584,29 +209,16 @@ function Uploader({ value, onChange }) {
   const ref = useRef(null);
   const EXTS = ['.jpg', '.jpeg', '.png', '.pdf', '.docx'];
   const MAX = 30 * 1024 * 1024;
- 
-  // const handle = (file) => {
-  //   if (!file) return;
-  //   const ext = '.' + file.name.split('.').pop().toLowerCase();
-  //   if (!EXTS.includes(ext)) { setErr(`Invalid: ${EXTS.join(', ')}`); return; }
-  //   if (file.size > MAX) { setErr('Max 30 MB'); return; }
-  //   setErr('');
-  //   const reader = new FileReader();
-  //   reader.onload = () => {
-  //     const base64 = reader.result.split(',')[1];
-  //     onChange({ name: file.name, size: file.size, type: file.type, base64 });
-  //   };
-  //   reader.readAsDataURL(file);
-  // };
+
   const handle = (file) => {
     if (!file) return;
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     if (!EXTS.includes(ext)) { setErr(`Invalid: ${EXTS.join(', ')}`); return; }
     if (file.size > MAX) { setErr('Max 30 MB'); return; }
     setErr('');
-    // Keep raw File object — no base64 conversion needed
     onChange({ name: file.name, size: file.size, type: file.type, raw: file });
   };
+
   return (
     <div className="ci-form-group span-full">
       <label className="ci-form-label">Attachments</label>
@@ -634,7 +246,7 @@ function Uploader({ value, onChange }) {
     </div>
   );
 }
- 
+
 /* ── Main Page ───────────────────────────────────────────────────────────── */
 export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
   const { user } = useAuth();
@@ -643,41 +255,93 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
 
   const location = useLocation();
   const navigate = useNavigate();
- 
+
   const [currentUser, setCurrentUser] = useState(null);
- 
+
+  // ── Fetch logged-in user details ────────────────────────────────────────
   useEffect(() => {
     userApi.getUserById(user.userId)
       .then(res => setCurrentUser(res.data))
-      .catch(() => {});
+      .catch(() => { });
   }, [user.userId]);
- 
+
+  // ── Fetch locations from DB (same as OurCreateTicketPage) ───────────────
+  const [locations, setLocations] = useState([]);
+
+  useEffect(() => {
+    getAllLocations()
+      .then(res => {
+        const arr = Array.isArray(res?.data) ? res.data
+          : Array.isArray(res) ? res : [];
+        setLocations(arr);
+      })
+      .catch(() => {
+        // Fallback list if API is unavailable
+        setLocations([
+          { id: 1, locationName: 'Bangalore' },
+          { id: 2, locationName: 'Chennai' },
+          { id: 3, locationName: 'Mumbai' },
+          { id: 4, locationName: 'Delhi' },
+          { id: 5, locationName: 'Hyderabad' },
+          { id: 6, locationName: 'Pune' },
+          { id: 7, locationName: 'Kolkata' },
+          { id: 8, locationName: 'Noida' },
+          { id: 9, locationName: 'Gurgaon' },
+        ]);
+      });
+  }, []);
+
+  // ── Fetch all users for Breach By User dropdown ─────────────────────────
+  const [allUsers, setAllUsers] = useState([]);
+
+  // useEffect(() => {
+  //   userApi.getAllUsers()
+  //     .then(res => {
+  //       const arr = Array.isArray(res?.data) ? res.data
+  //         : Array.isArray(res) ? res : [];
+  //       setAllUsers(arr);
+  //     })
+  //     .catch(() => {
+  //       setAllUsers([]);
+  //     });
+  // }, []);
+
+  useEffect(() => {
+    userApi.getAllUsers()
+      .then(res => {
+        const arr = res.data?.content || res.data || [];
+        setAllUsers(Array.isArray(arr) ? arr : []);
+      })
+      .catch(() => setAllUsers([]));
+  }, []);
+
+
   const userName = currentUser?.fullName ||
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || '';
   const userEmail = currentUser?.email || '';
- 
+
   // ── Auto-generated subject (read-only) ──────────────────────────────────
   const autoSubject = [category?.name, subcategory?.name, userName]
     .filter(Boolean).join(' | ');
- 
+
   const [form, setForm] = useState({
-    description:      '',
-    priority:         '',
-    source:           '',
-    occurredAt:       '',
-    breachByUser:     '',
+    description: '',
+    priority: '',
+    source: '',
+    occurredAt: '',
+    breachByUser: '',
     incidentLocation: '',
-    officeLocation:   '',
+    officeLocation: '',
   });
   const [attachment, setAttachment] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
- 
+
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => { const n = { ...e }; delete n[k]; return n; });
   };
- 
+
   const validate = () => {
     const e = {};
     if (!form.description.trim() || form.description === '<br>')
@@ -688,82 +352,41 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
       e.source = 'Source is required';
     return e;
   };
- 
-  // const handleSubmit = async () => {
-  //   const e = validate();
-  //   if (Object.keys(e).length) { setErrors(e); return; }
-  //   setLoading(true);
-  //   try {
-  //     const payload = {
-  //       userId:           currentUser?.id,
-  //       requesterName:    userName,
-  //       email:            userEmail,
- 
-  //       // ── FIX: categoryId + name and subCategoryId + name both stored ──
-  //       categoryId:       category?.categoryId ?? category?.id,
-  //       categoryName:     category?.name,           // ← was missing / duplicated
-  //       subCategoryId:    subcategory?.subcategoryId ?? subcategory?.id,
-  //       subCategoryName:  subcategory?.name,         // ← was missing / duplicated
- 
-  //       subject:          autoSubject,
-  //       description:      form.description,
-  //       priority:         form.priority,
-  //       source:           form.source,
-  //       breachByUser:     form.breachByUser     || null,
-  //       occurredAt:       form.occurredAt       || null,
-  //       incidentLocation: form.incidentLocation || null,
-  //       officeLocation:   form.officeLocation   || null,
-  //       attachmentPath:   attachment?.name      || null,
-  //     };
- 
-  //     const result = await incidentApi.createIncident(payload);
-  //     toast.success('Incident reported successfully!');
-  //     if (typeof onSuccess === 'function') onSuccess(result);
-  //   } catch (err) {
-  //     console.error(err);
-  //     const msg = err?.response?.data?.message || err.message || 'Failed to submit incident';
-  //     toast.error(msg);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+
   const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     setLoading(true);
     try {
       const ticketJson = {
-        userId:           currentUser?.id,
-        requesterName:    userName,
-        email:            userEmail,
-        categoryId:       category?.categoryId ?? category?.id,
-        categoryName:     category?.name,
-        subCategoryId:    subcategory?.subcategoryId ?? subcategory?.id,
-        subCategoryName:  subcategory?.name,
-        subject:          autoSubject,
-        description:      form.description,
-        priority:         form.priority,
-        source:           form.source,
-        breachByUser:     form.breachByUser     || null,
-        occurredAt:       form.occurredAt       || null,
+        userId: currentUser?.id,
+        requesterName: userName,
+        email: userEmail,
+        categoryId: category?.categoryId ?? category?.id,
+        categoryName: category?.name,
+        subCategoryId: subcategory?.subcategoryId ?? subcategory?.id,
+        subCategoryName: subcategory?.name,
+        subject: autoSubject,
+        description: form.description,
+        priority: form.priority,
+        source: form.source,
+        breachByUser: form.breachByUser || null,
+        occurredAt: form.occurredAt || null,
         incidentLocation: form.incidentLocation || null,
-        officeLocation:   form.officeLocation   || null,
+        officeLocation: form.officeLocation || null,
       };
- 
+
       const formData = new FormData();
- 
-      // Ticket fields as JSON blob in "data" part
       formData.append('data', new Blob([JSON.stringify(ticketJson)], {
         type: 'application/json',
       }));
- 
-      // Append raw file directly — no base64 conversion
       if (attachment?.raw) {
         formData.append('file', attachment.raw);
       }
+
       let path = location.pathname;
-      navigate(path.substring(0,path.indexOf('service'))+'/tickets')
-      
+      navigate(path.substring(0, path.indexOf('service')) + '/tickets');
+
       const result = await incidentApi.createIncident(formData);
       toast.success('Incident reported successfully!');
       if (typeof onSuccess === 'function') onSuccess(result);
@@ -775,15 +398,14 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
       setLoading(false);
     }
   };
- 
- 
+
   return (
     <>
       <StyleInjector />
- 
+
       {/* ── Page Header ── */}
-      <div className="page-header" style={{ display:'flex', flexDirection:'column' }}>
-        <div className="page-header__breadcrumb" style={{display:'block', textAlign: 'left', width:'100%',justifyContent: 'flex-start' }}>
+      <div className="page-header" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="page-header__breadcrumb" style={{ display: 'block', textAlign: 'left', width: '100%', justifyContent: 'flex-start' }}>
           <span onClick={onBack} style={{ cursor: 'pointer' }}>Service Catalog</span>
           <span className="sep"> › </span>
           <span>{category?.name}</span>
@@ -796,10 +418,10 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
           {category?.name} — {subcategory?.name}
         </div>
       </div>
- 
+
       {/* ── Form Card ── */}
       <div className="card">
- 
+
         {/* ── Section: Category Info ── */}
         <div className="ci-section-title-block">Category</div>
         <div className="ci-form-grid">
@@ -810,7 +432,7 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
             <div className="ci-readonly-field">{subcategory?.name || '—'}</div>
           </Field>
         </div>
- 
+
         {/* ── Section: Requester Details ── */}
         <div className="ci-section-title-block">Requester Details</div>
         <div className="ci-form-grid">
@@ -829,17 +451,17 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
             </div>
           </Field>
         </div>
- 
+
         {/* ── Section: Incident Details ── */}
         <div className="ci-section-title-block">Incident Details</div>
- 
+
         {/* Subject — auto-generated, full width */}
         <Field label="Subject" required>
           <div className="ci-readonly-field" style={{ color: 'var(--gray-7)' }}>
             {autoSubject || 'Auto-generated'}
           </div>
         </Field>
- 
+
         {/* Description — full width RTE */}
         <Field label="Description" required error={errors.description}>
           <RTE
@@ -849,7 +471,7 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
             placeholder="Describe the incident — what happened, impact, steps to reproduce..."
           />
         </Field>
- 
+
         {/* Priority + Source */}
         <div className="ci-form-grid">
           <Field label="Priority" required error={errors.priority}>
@@ -864,7 +486,7 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
               <option value="Low">Low</option>
             </select>
           </Field>
- 
+
           <Field label="Source" required error={errors.source}>
             <select
               className={`ci-form-control${errors.source ? ' error' : ''}`}
@@ -877,11 +499,11 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
             </select>
           </Field>
         </div>
- 
+
         {/* ── Section: Additional Info ── */}
         <div className="ci-section-title-block">Additional Info</div>
         <div className="ci-form-grid">
- 
+
           <Field label="Occurred At (Date & Time)">
             <input
               type="datetime-local"
@@ -890,16 +512,33 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
               onChange={e => set('occurredAt', e.target.value)}
             />
           </Field>
- 
+
+          {/* ── Breach By User — dropdown from user table ── */}
           <Field label="Breach By User">
-            <input
+            <select
               className="ci-form-control"
               value={form.breachByUser}
               onChange={e => set('breachByUser', e.target.value)}
-              placeholder="Name or ID of the user"
-            />
+            >
+              <option value="">— Select User —</option>
+              {allUsers.length === 0 ? (
+                <option disabled>Loading users...</option>
+              ) : (
+                allUsers.map(u => {
+                  const fullName = u.fullName ||
+                    [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '';
+                  const id = u.id || u.userId || u.employeeId || fullName;
+                  return (
+                    <option key={id} value={fullName}>
+                      {fullName}{u.employeeId ? ` (${u.employeeId})` : ''}
+                    </option>
+                  );
+                })
+              )}
+            </select>
           </Field>
- 
+
+          {/* ── Incident Location — dropdown from location DB ── */}
           <Field label="Incident Location">
             <input
               className="ci-form-control"
@@ -908,23 +547,35 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
               placeholder="e.g. Floor 3, Server Room"
             />
           </Field>
- 
+
+
           <Field label="Office Location">
-            <input
+            <select
               className="ci-form-control"
               value={form.officeLocation}
               onChange={e => set('officeLocation', e.target.value)}
-              placeholder="e.g. HQ, Branch A"
-            />
+            >
+              <option value="">— Select Location —</option>
+              {locations.length === 0 ? (
+                <option disabled>Loading locations...</option>
+              ) : (
+                locations.map(l => {
+                  const name = l.locationName || l.name || l;
+                  const id = l.id || name;
+                  return <option key={id} value={name}>{name}</option>;
+                })
+              )}
+            </select>
           </Field>
- 
+
+
         </div>
- 
+
         {/* Attachment */}
         <div className="ci-form-grid">
           <Uploader value={attachment} onChange={setAttachment} />
         </div>
- 
+
         {/* ── Actions ── */}
         <div className="divider" style={{ margin: '8px 0' }} />
         <div className="flex-end flex-gap-3">
@@ -940,7 +591,7 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
             Submit Incident
           </Button>
         </div>
- 
+
       </div>{/* /card */}
     </>
   );
