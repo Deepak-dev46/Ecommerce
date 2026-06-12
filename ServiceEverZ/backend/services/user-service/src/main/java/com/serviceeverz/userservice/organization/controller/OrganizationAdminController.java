@@ -71,5 +71,19 @@ public class OrganizationAdminController {
         service.disableDesignation(id);
         return ResponseEntity.noContent().build();
     }
+    @DeleteMapping("/departments/{id}")
+    public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
+        service.deleteDepartment(id);
+        return ResponseEntity.noContent().build();
+    }
+     
+    @DeleteMapping("/designations/{id}")
+    public ResponseEntity<Void> deleteDesignation(@PathVariable Long id) {
+        service.deleteDesignation(id);
+        return ResponseEntity.noContent().build();
+    }
+     
+    
+    
 }
  
