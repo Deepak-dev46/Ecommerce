@@ -31,6 +31,8 @@ export default function ResolveSection({ ticketId, supportPersonId, supportPerso
       await ticketClient.post(`/api/tickets/${ticketId}/resolve`, {
         resolutionMessage: comment.trim(),
         supportPersonId: supportPersonId || null,
+        // ✅ FIX: Pass agent name so backend writes real name to ticket_history
+        supportPersonName: supportPersonName || null,
       });
       setDone(true);
       setOpen(false);

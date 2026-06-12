@@ -32,7 +32,7 @@ eureka:
  
 admin:
   default:
-    email: ramadoss.selvaraj@relevantz.com
+    email: santhosh.raman@relevantz.com
     password: Admin@123
     firstName: Ramdoss
     lastName: Selvaraj

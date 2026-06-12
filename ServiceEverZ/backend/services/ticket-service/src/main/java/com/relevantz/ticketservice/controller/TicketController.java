@@ -434,13 +434,16 @@ public class TicketController {
         String resolutionMessage = (String) body.get("resolutionMessage");
         Long supportPersonId = body.get("supportPersonId") != null
                 ? Long.parseLong(body.get("supportPersonId").toString()) : null;
+        // ✅ FIX: Also extract supportPersonName so history shows real agent name
+        String supportPersonName = body.get("supportPersonName") != null
+                ? body.get("supportPersonName").toString() : null;
         if (resolutionMessage == null || resolutionMessage.isBlank()) {
             ApiResponse<TicketResponse> err = new ApiResponse<>();
             err.setSuccess(false); err.setMessage("Resolution message is required");
             err.setTimestamp(LocalDateTime.now());
             return ResponseEntity.badRequest().body(err);
         }
-        TicketResponse data = ourService.resolveTicket(id, resolutionMessage, supportPersonId);
+        TicketResponse data = ourService.resolveTicket(id, resolutionMessage, supportPersonId, supportPersonName);
         return ResponseEntity.ok(ok("Ticket resolved — user notified", data));
     }
      
@@ -597,5 +600,4 @@ public class TicketController {
         return r;
     }
 }
- 
  

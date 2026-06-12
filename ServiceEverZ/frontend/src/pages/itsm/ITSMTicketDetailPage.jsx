@@ -237,19 +237,39 @@ function CommentBubble({ comment, isSupport }) {
   );
 }
 
-function HistoryRow({ event }) {
+function HistoryRow({ event, prevStatus }) {
+  // ✅ FIX: Correct locale and timezone-aware display
   const createdAt = new Date(event.createdAt);
-  const date = createdAt.toLocaleDateString('en-US', {
+  const date = createdAt.toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
-  const time = createdAt.toLocaleTimeString('en-US', {
-    hour: 'numeric',
+  const time = createdAt.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   });
-  const actor =
-    event.changed_by === 0 ? 'System' : event.changed_by_name || 'Support Agent';
+
+  const isSystem = event.changedBy === 0 || event.changedBy === null
+                || event.changed_by === 0 || event.changed_by === null;
+  const actor = isSystem ? 'System Engine'
+              : (event.createdByName || event.changedByName || event.changed_by_name || 'Support Agent');
+
+  // ✅ FIX: Semantic color based on event outcome
+  const remarks = (event.remarks || '').toUpperCase();
+  const isRejected = remarks.includes('REJECTED') || event.status === 'CANCELLED';
+  const isApproved = remarks.includes('APPROVED');
+  const isResolved = event.status === 'RESOLVED';
+  const isClosed   = event.status === 'CLOSED';
+  const isReopened = event.status === 'REOPENED' || remarks.includes('REOPENED');
+
+  const dotColor = isRejected  ? '#EF4444'
+                 : isApproved || isResolved || isClosed ? '#22C55E'
+                 : isReopened  ? '#F59E0B'
+                 : isSystem    ? '#9CA3AF'
+                 : '#27235C';
+
   const showStatusChip =
     event.status && !event.remarks?.toLowerCase().includes(event.status.toLowerCase());
 
@@ -261,7 +281,7 @@ function HistoryRow({ event }) {
             width: 10,
             height: 10,
             borderRadius: '50%',
-            bgcolor: event.changed_by === 0 ? '#9CA3AF' : '#27235C',
+            bgcolor: dotColor,
           }}
         />
       </Box>
@@ -272,7 +292,19 @@ function HistoryRow({ event }) {
         <Typography sx={{ fontSize: '0.85rem', fontWeight: 500, mb: 0.6 }}>
           {event.remarks}
         </Typography>
-        {showStatusChip && <TicketStatusChip status={event.status} />}
+        {showStatusChip && (
+          <Stack direction="row" alignItems="center" spacing={0.8}>
+            {prevStatus && prevStatus !== event.status && (
+              <>
+                <span style={{ fontSize: '0.72rem', color: '#6B7280', opacity: 0.7 }}>
+                  {prevStatus.replace(/_/g, ' ')}
+                </span>
+                <span style={{ color: '#9CA3AF', fontWeight: 700 }}>➔</span>
+              </>
+            )}
+            <TicketStatusChip status={event.status} />
+          </Stack>
+        )}
       </Box>
     </Stack>
   );
@@ -999,11 +1031,21 @@ function WorklogTab({ history }) {
     );
   }
 
+  // ✅ FIX: Sort chronologically (oldest first) so lifecycle flows top-to-bottom
+  const ascendingHistory = [...history].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
   return (
     <Box sx={{ p: 3 }}>
-      {[...history].reverse().map((event) => (
-        <HistoryRow key={event.history_id} event={event} />
-      ))}
+      {ascendingHistory.map((event, idx) => {
+        const prevStatus = idx > 0 ? ascendingHistory[idx - 1].status : null;
+        return (
+          <HistoryRow
+            key={event.history_id || idx}
+            event={event}
+            prevStatus={prevStatus}
+          />
+        );
+      })}
     </Box>
   );
 }

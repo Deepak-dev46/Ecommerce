@@ -49,6 +49,7 @@ import StorageIcon from '@mui/icons-material/StorageOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import WorkIcon from '@mui/icons-material/Work';
 import { Send as SendIcon } from '@mui/icons-material';
+import { InputAdornment } from '@mui/material';
 
 // API & Context
 import {
@@ -375,6 +376,8 @@ function CommentBubble({ comment, isOwnMessage }) {
   );
 }
 
+const MAX_CHARS = 100;
+ 
 function ConversationsTab({
   comments,
   ticket,
@@ -387,9 +390,25 @@ function ConversationsTab({
   user,
 }) {
   const canComment = COMMENT_ALLOWED.includes(ticket?.status) && allowUserReply;
-
+  const charCount = commentText.length;
+  const isEmpty = commentText.trim().length === 0;
+ 
+  const getCounterColor = () => {
+    if (charCount >= MAX_CHARS) return '#EF4444';
+    if (charCount >= MAX_CHARS * 0.8) return '#F59E0B';
+    return '#9CA3AF';
+  };
+ 
+  const getBorderColor = (isHover = false) => {
+    if (charCount >= MAX_CHARS) return '#EF4444';
+    if (charCount > 0) return isHover ? '#1A9A3C' : '#24A148';
+    return isHover ? '#D1D5DB' : '#E5E7EB';
+  };
+ 
   return (
     <Box sx={{ p: 3 }}>
+ 
+      {/* Comments List */}
       {comments.length === 0 ? (
         <EmptyState
           icon={<ChatBubbleOutlineIcon />}
@@ -409,44 +428,101 @@ function ConversationsTab({
           }}
         >
           {comments.map((c, i) => (
-            <CommentBubble key={c.id || i} comment={c} isOwnMessage={c.userId === user?.userId} />
+            <CommentBubble
+              key={c.id || i}
+              comment={c}
+              isOwnMessage={c.userId === user?.userId}
+            />
           ))}
           <div ref={commentsEndRef} />
         </Box>
       )}
-
+ 
+      {/* Reply Input */}
       {canComment && (
         <Stack spacing={1.5} sx={{ mt: 2 }}>
-          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>Add Reply</Typography>
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>
+            Add Reply
+          </Typography>
+ 
           <TextField
             multiline
             minRows={3}
             maxRows={8}
             placeholder="Type your reply here..."
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value.length <= MAX_CHARS) {
+                setCommentText(e.target.value);
+              }
+            }}
             fullWidth
             variant="outlined"
-            helperText={commentText.trim().length > 0 ? `${commentText.trim().length} characters` : 'Reply cannot be empty'}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment
+                  position="end"
+                  sx={{ alignSelf: 'flex-end', mb: 1.2, mr: 0.5 }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: getCounterColor(),
+                      transition: 'color 0.2s ease',
+                    }}
+                  >
+                    {charCount}/{MAX_CHARS}
+                  </Typography>
+                </InputAdornment>
+              ),
+            }}
+            helperText={isEmpty ? 'Reply cannot be empty' : ''}
             FormHelperTextProps={{
               sx: {
                 fontSize: '0.74rem',
-                color: commentText.trim().length > 0 ? '#24A148' : '#9CA3AF',
+                color: '#9CA3AF',
                 mt: 0.5,
               },
             }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '10px',
+                fontSize: '0.87rem',
+                alignItems: 'flex-start',
+                '& fieldset': {
+                  borderColor: getBorderColor(),
+                  transition: 'border-color 0.2s ease',
+                },
+                '&:hover fieldset': {
+                  borderColor: getBorderColor(true),
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: charCount >= MAX_CHARS ? '#EF4444' : '#24A148',
+                },
+              },
+            }}
           />
+ 
           <Stack direction="row" justifyContent="flex-end" spacing={1}>
             <Button
               variant="contained"
-              endIcon={submitting ? <CircularProgress size={13} color="inherit" /> : <SendIcon />}
+              endIcon={
+                submitting
+                  ? <CircularProgress size={13} color="inherit" />
+                  : <SendIcon />
+              }
               onClick={onAddComment}
-              disabled={submitting || !commentText.trim()}
+              disabled={submitting || isEmpty || charCount >= MAX_CHARS}
               sx={{
                 backgroundColor: '#27235C',
                 borderRadius: '8px',
                 fontSize: '0.82rem',
                 '&:hover': { backgroundColor: '#1B193F' },
+                '&.Mui-disabled': {
+                  backgroundColor: '#E5E7EB',
+                  color: '#9CA3AF',
+                },
               }}
             >
               {submitting ? 'Sending…' : 'Send Reply'}
@@ -454,12 +530,14 @@ function ConversationsTab({
           </Stack>
         </Stack>
       )}
-
+ 
+      {/* Disabled Reply Notice */}
       {COMMENT_ALLOWED.includes(ticket?.status) && !allowUserReply && (
         <Typography sx={{ mt: 2, fontSize: '0.75rem', color: '#9CA3AF' }}>
           Replying is disabled by support personnel.
         </Typography>
       )}
+ 
     </Box>
   );
 }

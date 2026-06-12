@@ -792,6 +792,7 @@
 package com.relevantz.ticketservice.service.impl;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -921,7 +922,7 @@ public class OurTicketServiceImpl implements OurTicketService {
 				.orElseThrow(() -> new RuntimeException("Ticket not found: " + req.getTicketId()));
 		ticket.setStatus(TicketStatus.OPEN);
 		ticket.setDraft(false);
-		ticket.setUpdatedAt(LocalDateTime.now());
+		ticket.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 		Ticket saved = ticketRepo.save(ticket);
 
 		createQueue(saved);
@@ -1040,7 +1041,7 @@ public class OurTicketServiceImpl implements OurTicketService {
 		t.setRequiresResourceApproval(isOthers);
 		log.info("Ticket item='{}', requiresResourceApproval={}", req.getItem(), isOthers);
 
-		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 		t.setSlaStartTime(now);
 		t.setSlaDeadline(now.plusHours(slaHours(t.getPriority())));
 		t.setSlaBreached(false);
@@ -1320,6 +1321,17 @@ public class OurTicketServiceImpl implements OurTicketService {
 		historyRepo.save(h);
 	}
 
+	// ✅ FIX: Overload that records the actual actor (support person / end user)
+	private void history(Ticket t, String msg, Long actorId, String actorName) {
+		TicketHistory h = new TicketHistory();
+		h.setTicketId(t.getTicketId());
+		h.setStatus(t.getStatus());
+		h.setRemarks(msg);
+		h.setChangedBy(actorId != null ? actorId : 0L);
+		h.setChangedByName(actorName != null && !actorName.isBlank() ? actorName : "System");
+		historyRepo.save(h);
+	}
+
 	@SuppressWarnings("unchecked")
 	private String resolveEmail(Long userId) {
 		if (userId == null) {
@@ -1476,7 +1488,7 @@ public class OurTicketServiceImpl implements OurTicketService {
 		// Fix SLA fields if they are null from original save (prevent constraint
 		// errors)
 		if (ticket.getSlaStartTime() == null)
-			ticket.setSlaStartTime(LocalDateTime.now());
+			ticket.setSlaStartTime(LocalDateTime.now(ZoneOffset.UTC));
 		if (ticket.getSlaDeadline() == null) {
 			Priority p = ticket.getPriority();
 			int hrs = (p == Priority.HIGH) ? 8 : (p == Priority.LOW) ? 72 : 24;
@@ -1491,15 +1503,20 @@ public class OurTicketServiceImpl implements OurTicketService {
 		if (ticket.getMode() == null)
 			ticket.setMode(TicketMode.PORTAL);
 
-		ticket.setUpdatedAt(LocalDateTime.now());
+		ticket.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
 		try {
-			Ticket saved = ticketRepo.save(ticket);
-			history(saved, "Draft updated");
-			return toResponse(saved);
+		    Ticket saved = ticketRepo.save(ticket);
+		    // Save/replace attachment if a new one was provided
+		    if (req.getAttachmentBase64() != null && !req.getAttachmentBase64().isBlank()) {
+		        attachmentRepo.deleteByTicketId(saved.getTicketId());
+		        saveAttachment(saved.getTicketId(), req);
+		    }
+		    history(saved, "Draft updated");
+		    return toResponse(saved);
 		} catch (Exception ex) {
-			log.error("updateDraft failed for ticketId={}: {}", ticketId, ex.getMessage(), ex);
-			throw new RuntimeException("Failed to update draft: " + ex.getMessage());
+		    log.error("updateDraft failed for ticketId={}: {}", ticketId, ex.getMessage(), ex);
+		    throw new RuntimeException("Failed to update draft: " + ex.getMessage());
 		}
 	}
 
@@ -1511,7 +1528,7 @@ public class OurTicketServiceImpl implements OurTicketService {
 
 	@Override
 
-	public TicketResponse resolveTicket(Long ticketId, String resolutionMessage, Long supportPersonId) {
+	public TicketResponse resolveTicket(Long ticketId, String resolutionMessage, Long supportPersonId, String supportPersonName) {
 		Ticket ticket = ticketRepo.findById(ticketId)
 	            .orElseThrow(() -> new RuntimeException("Ticket not found: " + ticketId));
 	 
@@ -1525,13 +1542,26 @@ public class OurTicketServiceImpl implements OurTicketService {
 
 		ticket.setStatus(TicketStatus.PENDING_USER_ACK);
 
-		ticket.setUpdatedAt(LocalDateTime.now());
+		ticket.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
 		Ticket saved = ticketRepo.save(ticket);
 
-		// Record in history
-
-		history(saved, "Resolved by support — awaiting user acknowledgement");
+		// ✅ FIX: Record support person name instead of hardcoded "System"
+		String supportName = null;
+		if (supportPersonId != null) {
+			try {
+				String email = resolveEmail(supportPersonId);
+				// We don't have the name here, so resolve it via the same lookup
+				// Use a best-effort approach: the email lookup returns the person's email;
+				// for the history label we use what we can get.
+				supportName = email;
+			} catch (Exception ignored) {}
+		}
+		String actorName = (supportPersonName != null && !supportPersonName.isBlank())
+				? supportPersonName
+				: (supportName != null ? supportName : "Support Personnel");
+		history(saved, "Resolved by support — awaiting user acknowledgement",
+				supportPersonId, actorName);
 
 		// Email the requester
 
@@ -1589,13 +1619,14 @@ public class OurTicketServiceImpl implements OurTicketService {
 
 		ticket.setStatus(TicketStatus.RESOLVED);
 
-		ticket.setUpdatedAt(LocalDateTime.now());
+		ticket.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
 		Ticket saved = ticketRepo.save(ticket);
 
-		// Record in history
-
-		history(saved, "User acknowledged the resolution");
+		// ✅ FIX: Record the requester's name in history instead of "System"
+		String requesterLabel = saved.getRequesterName() != null && !saved.getRequesterName().isBlank()
+				? saved.getRequesterName() : "End User";
+		history(saved, "User acknowledged the resolution", saved.getUserId(), requesterLabel);
 
 		// Email the assignee (support person) to notify they can close
 

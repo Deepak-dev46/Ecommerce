@@ -180,13 +180,42 @@ public class ApprovalServiceImpl implements ApprovalService {
 		case "RESOURCE" -> processResourceOwner(approval, action, request.getRemarks());
 		default -> throw new ApprovalException("Invalid approver level: " + level);
 		}
+		// ✅ FIX: Write a history row that reflects the real outcome of this stage.
+		// CANCELLED  = any rejection (red in UI)
+		// OPEN       = intermediate approval (L1 done, waiting for L2)
+		// PENDING_USER_ACK = fully approved and assigned to support (ticket is now live)
+		boolean isRejected   = "REJECTED".equalsIgnoreCase(action);
+		boolean isFullyDone  = ApprovalConstants.APPROVED.equals(approval.getOverallStatus());
+		TicketStatus histStatus = isRejected  ? TicketStatus.CANCELLED
+		                        : isFullyDone ? TicketStatus.OPEN   // overall approved → ticket is open/active
+		                        :               TicketStatus.OPEN;  // partial (L1 done, awaiting L2)
+
+		String remarkSuffix = (request.getRemarks() != null && !request.getRemarks().isBlank())
+				? " — " + request.getRemarks() : "";
+		String actorLabel = request.getApproverLevel() + " Manager";
+
 		TicketHistory history = new TicketHistory();
 		history.setTicketId(request.getTicketId());
-		history.setStatus(TicketStatus.OPEN);
-		history.setChangedByName(request.getApproverLevel()+" Manager");
-		history.setRemarks(request.getAction()+" By "+request.getApproverLevel()+" Manager");
+		history.setStatus(histStatus);
+		history.setChangedByName(actorLabel);
+		history.setChangedBy(null);
+		history.setRemarks(action + " By " + actorLabel + remarkSuffix);
 		history.setCreatedAt(LocalDateTime.now());
 		historyRepository.save(history);
+
+		// ✅ FIX: When fully approved, write a second "Fully Approved" history entry
+		// so the History tab shows the complete transition to active support status.
+		if (isFullyDone) {
+			TicketHistory fullyApproved = new TicketHistory();
+			fullyApproved.setTicketId(request.getTicketId());
+			fullyApproved.setStatus(TicketStatus.OPEN);
+			fullyApproved.setChangedByName("SD Bot");
+			fullyApproved.setChangedBy(null);
+			fullyApproved.setRemarks("Fully approved — ticket assigned to support team and SLA started");
+			fullyApproved.setCreatedAt(LocalDateTime.now());
+			historyRepository.save(fullyApproved);
+		}
+
 		approval.setUpdatedAt(LocalDateTime.now());
 		return approvalMapper.toResponse(approvalRepository.save(approval));
 	}
@@ -384,6 +413,15 @@ public class ApprovalServiceImpl implements ApprovalService {
 					&& !approval.getResourceOwnerName().isBlank()) ? approval.getResourceOwnerName() : "Resource Owner";
 			sendEmailSafe(requesterEmail, "Ticket #" + approval.getTicketId() + " - Fully Approved",
 					buildFullyApprovedEmailBody(approval.getTicketId(), roApproverName));
+			// ✅ FIX: Write a "Fully Approved" history entry so History tab shows this event
+			TicketHistory roApproved = new TicketHistory();
+			roApproved.setTicketId(approval.getTicketId());
+			roApproved.setStatus(TicketStatus.OPEN);
+			roApproved.setChangedByName("SD Bot");
+			roApproved.setChangedBy(null);
+			roApproved.setRemarks("Fully approved by Resource Owner — ticket assigned to support team and SLA started");
+			roApproved.setCreatedAt(LocalDateTime.now());
+			historyRepository.save(roApproved);
 			log.info("RESOURCE OWNER APPROVED ticketId={} | assignment triggered", approval.getTicketId());
 		} else {
 			String roRejectorName = (approval.getResourceOwnerName() != null
