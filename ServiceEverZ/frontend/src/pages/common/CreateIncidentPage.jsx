@@ -514,63 +514,29 @@ export default function CreateIncidentPage({ onSuccess, showSnack, onBack }) {
           </Field>
 
           {/* ── Breach By User — dropdown from user table ── */}
-          {/* ── Breach By User — searchable dropdown ── */}
           <Field label="Breach By User">
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                className="ci-form-control"
-                placeholder={allUsers.length === 0 ? 'Loading users...' : 'Search by name or ID...'}
-                value={breachUserSearch}
-                onChange={e => {
-                  setBreachUserSearch(e.target.value);
-                  if (!e.target.value) set('breachByUser', '');
-                }}
-                autoComplete="off"
-              />
-              {breachUserSearch && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
-                  background: '#fff', border: '1.5px solid #27235C', borderRadius: 5,
-                  maxHeight: 180, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                  marginTop: 2
-                }}>
-                  {(() => {
-                    const q = breachUserSearch.toLowerCase();
-                    const filtered = allUsers.filter(u => {
-                      const fullName = u.fullName ||
-                        [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '';
-                      const empId = u.employeeId ? String(u.employeeId).toLowerCase() : '';
-                      return fullName.toLowerCase().includes(q) || empId.includes(q);
-                    });
-                    if (filtered.length === 0)
-                      return <div style={{ padding: '8px 10px', fontSize: 12, color: '#6b7280' }}>No users found</div>;
-                    return filtered.map(u => {
-                      const fullName = u.fullName ||
-                        [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '';
-                      const id = u.id || u.userId || u.employeeId || fullName;
-                      const label = fullName + (u.employeeId ? ` (${u.employeeId})` : '');
-                      return (
-                        <div
-                          key={id}
-                          style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: '#1f2937' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#ede9fe'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                          onMouseDown={() => {
-                            set('breachByUser', fullName);
-                            setBreachUserSearch(label);
-                          }}
-                        >
-                          {label}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
+            <select
+              className="ci-form-control"
+              value={form.breachByUser}
+              onChange={e => set('breachByUser', e.target.value)}
+            >
+              <option value="">— Select User —</option>
+              {allUsers.length === 0 ? (
+                <option disabled>Loading users...</option>
+              ) : (
+                allUsers.map(u => {
+                  const fullName = u.fullName ||
+                    [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '';
+                  const id = u.id || u.userId || u.employeeId || fullName;
+                  return (
+                    <option key={id} value={fullName}>
+                      {fullName}{u.employeeId ? ` (${u.employeeId})` : ''}
+                    </option>
+                  );
+                })
               )}
-            </div>
+            </select>
           </Field>
-
 
           {/* ── Incident Location — dropdown from location DB ── */}
           <Field label="Incident Location">

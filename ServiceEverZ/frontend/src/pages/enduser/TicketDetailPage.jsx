@@ -24,7 +24,7 @@ import {
   Tab,
   Tabs,
   TextField,
-  Typography, 
+  Typography,
 } from '@mui/material';
 
 // Material UI Icons
@@ -377,7 +377,7 @@ function CommentBubble({ comment, isOwnMessage }) {
 }
 
 const MAX_CHARS = 100;
- 
+
 function ConversationsTab({
   comments,
   ticket,
@@ -392,22 +392,22 @@ function ConversationsTab({
   const canComment = COMMENT_ALLOWED.includes(ticket?.status) && allowUserReply;
   const charCount = commentText.length;
   const isEmpty = commentText.trim().length === 0;
- 
+
   const getCounterColor = () => {
     if (charCount >= MAX_CHARS) return '#EF4444';
     if (charCount >= MAX_CHARS * 0.8) return '#F59E0B';
     return '#9CA3AF';
   };
- 
+
   const getBorderColor = (isHover = false) => {
     if (charCount >= MAX_CHARS) return '#EF4444';
     if (charCount > 0) return isHover ? '#1A9A3C' : '#24A148';
     return isHover ? '#D1D5DB' : '#E5E7EB';
   };
- 
+
   return (
     <Box sx={{ p: 3 }}>
- 
+
       {/* Comments List */}
       {comments.length === 0 ? (
         <EmptyState
@@ -437,14 +437,14 @@ function ConversationsTab({
           <div ref={commentsEndRef} />
         </Box>
       )}
- 
+
       {/* Reply Input */}
       {canComment && (
         <Stack spacing={1.5} sx={{ mt: 2 }}>
           <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>
             Add Reply
           </Typography>
- 
+
           <TextField
             multiline
             minRows={3}
@@ -503,7 +503,7 @@ function ConversationsTab({
               },
             }}
           />
- 
+
           <Stack direction="row" justifyContent="flex-end" spacing={1}>
             <Button
               variant="contained"
@@ -530,14 +530,14 @@ function ConversationsTab({
           </Stack>
         </Stack>
       )}
- 
+
       {/* Disabled Reply Notice */}
       {COMMENT_ALLOWED.includes(ticket?.status) && !allowUserReply && (
         <Typography sx={{ mt: 2, fontSize: '0.75rem', color: '#9CA3AF' }}>
           Replying is disabled by support personnel.
         </Typography>
       )}
- 
+
     </Box>
   );
 }
@@ -732,13 +732,13 @@ function InteractiveHistoryRow({ event, isLast, index, prevStatus }) {
   const createdAt = new Date(event.createdAt);
   const date = createdAt.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
   const time = createdAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  
+
   const isSystem = event.changedBy === 0;
   const actor = isSystem ? 'System Engine' : event.createdByName || 'Support Agent';
 
   return (
     <Box sx={{ display: 'flex', position: 'relative' }}>
-      
+
       {/* Dynamic Connector Track and Pipeline Nodes */}
       <Stack alignItems="center" sx={{ mr: 3, flexShrink: 0 }}>
         <Box
@@ -796,16 +796,16 @@ function InteractiveHistoryRow({ event, isLast, index, prevStatus }) {
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#1E293B' }}>
               {actor}
             </Typography>
-            <Chip 
-              label={isSystem ? 'Automated' : 'Agent Action'} 
-              size="small" 
-              sx={{ 
-                height: 18, 
-                fontSize: '0.65rem', 
+            <Chip
+              label={isSystem ? 'Automated' : 'Agent Action'}
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: '0.65rem',
                 fontWeight: 600,
                 backgroundColor: isSystem ? '#F8FAFC' : '#EFF6FF',
                 color: isSystem ? '#64748B' : '#2563EB'
-              }} 
+              }}
             />
           </Stack>
           <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 500 }}>
@@ -1379,14 +1379,66 @@ export default function TicketDetailPage() {
             </Stack>
             <Divider sx={{ mb: 1.5 }} />
             {ticket.attachments?.length > 0 ? (
-              ticket.attachments.map((a, i) => (
-                <Stack key={i} direction="row" spacing={1} alignItems="center" sx={{ py: 0.8 }}>
-                  <AttachFileIcon sx={{ fontSize: 14, color: '#9CA3AF' }} />
-                  <Typography sx={{ fontSize: '0.78rem', color: '#3B82F6', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
-                    {a.fileName || `Attachment ${i + 1}`}
-                  </Typography>
-                </Stack>
-              ))
+              // ticket.attachments.map((a, i) => (
+              //   <Stack key={i} direction="row" spacing={1} alignItems="center" sx={{ py: 0.8 }}>
+              //     <AttachFileIcon sx={{ fontSize: 14, color: '#9CA3AF' }} />
+              //     <Typography sx={{ fontSize: '0.78rem', color: '#3B82F6', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+              //       {a.fileName || `Attachment ${i + 1}`}
+              //     </Typography>
+              //   </Stack>
+              // ))
+              ticket.attachments.map((a, i) => {
+                // const handleOpen = () => {
+                //   if (!a.file) return;
+                //   const byteChars = atob(a.file);
+                //   const byteArray = new Uint8Array(byteChars.length);
+                //   for (let j = 0; j < byteChars.length; j++) {
+                //     byteArray[j] = byteChars.charCodeAt(j);
+                //   }
+                //   const blob = new Blob([byteArray], { type: a.mimeType || 'application/octet-stream' });
+                //   const url = URL.createObjectURL(blob);
+                //   window.open(url, '_blank');
+                // };
+                const openOrDownload = (forceDownload) => {
+  if (!a.file) return;
+  const byteChars = atob(a.file);
+  const byteArray = new Uint8Array(byteChars.length);
+  for (let j = 0; j < byteChars.length; j++) {
+    byteArray[j] = byteChars.charCodeAt(j);
+  }
+  const blob = new Blob([byteArray], { type: a.mimeType || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  if (forceDownload) {
+    link.download = a.filename || `attachment-${i + 1}`;
+  } else {
+    link.target = '_blank';
+  }
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+ 
+                return (
+                  <Stack key={a.attachmentID || i} direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ py: 0.8 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ overflow: 'hidden' }}>
+                      <AttachFileIcon sx={{ fontSize: 14, color: '#9CA3AF', flexShrink: 0 }} />
+                      <Typography
+                        onClick={() => openOrDownload(false)}
+                        sx={{ fontSize: '0.78rem', color: '#3B82F6', cursor: 'pointer', '&:hover': { textDecoration: 'underline' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {a.filename || `Attachment ${i + 1}`}
+                      </Typography>
+                    </Stack>
+                    <IconButton size="small" onClick={() => openOrDownload(true)} title="Download">
+                      <DownloadIcon sx={{ fontSize: 15, color: '#6B7280' }} />
+                    </IconButton>
+                  </Stack>
+                );
+              })
+
             ) : (
               <Typography sx={{ fontSize: '0.78rem', color: '#9CA3AF', textAlign: 'center', py: 1 }}>No attachments</Typography>
             )}
