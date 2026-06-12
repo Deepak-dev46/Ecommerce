@@ -15,5 +15,10 @@ public interface IOrganizationService {
     List<DesignationResponse> getDesignationsByDepartment(Long departmentId);
     DesignationResponse updateDesignation(Long id, DesignationRequest req);
     void disableDesignation(Long id);
+    void deleteDepartment(Long id);
+void deleteDesignation(Long id);
+ 
+
+
 }
  

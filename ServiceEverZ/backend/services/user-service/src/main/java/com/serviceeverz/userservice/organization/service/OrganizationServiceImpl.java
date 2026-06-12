@@ -119,5 +119,23 @@ public class OrganizationServiceImpl implements IOrganizationService {
         d.setActive(false);
         designationRepository.save(d);
     }
+    @Override
+    public void deleteDepartment(Long id) {
+        DepartmentEntity dept = departmentRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Department not found: " + id));
+        departmentRepository.delete(dept);
+    }
+     
+    @Override
+    public void deleteDesignation(Long id) {
+        DesignationEntity desig = designationRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Designation not found: " + id));
+        designationRepository.delete(desig);
+    }
+     
+
+ 
+
+
 }
  
