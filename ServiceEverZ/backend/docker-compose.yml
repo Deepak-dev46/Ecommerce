@@ -1,0 +1,297 @@
+services:
+ 
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: serviceeverz
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - serviceeverz-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+ 
+  eureka-service:
+    build:
+      context: ./services/eureka-service
+    container_name: eureka-service
+    ports:
+      - "8761:8761"
+    networks:
+      - serviceeverz-network
+ 
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: auth-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  user-service:
+    build:
+      context: ./services/user-service
+    container_name: user-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  ticket-service:
+    build:
+      context: ./services/ticket-service
+    container_name: ticket-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  email-service:
+    build:
+      context: ./services/email-service
+    container_name: email-service
+    depends_on:
+      - eureka-service
+    networks:
+      - serviceeverz-network
+ 
+  mail-service:
+    build:
+      context: ./services/mail-service
+    container_name: mail-service
+    depends_on:
+      - eureka-service
+    networks:
+      - serviceeverz-network
+ 
+  action-service:
+    build:
+      context: ./services/action-service
+    container_name: action-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  problem-service:
+    build:
+      context: ./services/problem-service
+    container_name: problem-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  approval-service:
+    build:
+      context: ./services/approval-service
+    container_name: approval-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  assignment-service:
+    build:
+      context: ./services/assignment-service
+    container_name: assignment-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  change-management-service:
+    build:
+      context: ./services/change-management-service
+    container_name: change-management-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  sla-service:
+    build:
+      context: ./services/sla-service
+    container_name: sla-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  incident-service:
+    build:
+      context: ./services/incident-service
+    container_name: incident-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  report-service:
+    build:
+      context: ./services/report-service
+    container_name: report-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  rmo-service:
+    build:
+      context: ./services/rmo-service
+    container_name: rmo-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  role-service:
+    build:
+      context: ./services/role-service
+    container_name: role-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  service-catalog:
+    build:
+      context: ./services/service-catalog
+    container_name: service-catalog
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+
+ 
+  knowledgebase-service:
+    build:
+      context: ./services/knowledgebase-service
+    container_name: knowledgebase-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+  asset-service:
+    build:
+      context: ./services/asset-service
+    container_name: asset-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+ 
+volumes:
+  mysql_data:
+ 
+networks:
+  serviceeverz-network:
+    driver: bridge
