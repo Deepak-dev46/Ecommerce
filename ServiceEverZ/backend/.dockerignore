@@ -1,0 +1,17 @@
+.git
+.gitignore
+.dockerignore
+.idea
+.vscode
+.settings
+*.md
+*.log
+.project
+.classpath
+.sonarlint
+.github
+node_modules
+target
+__pycache__
+*.pyc
+.env.local

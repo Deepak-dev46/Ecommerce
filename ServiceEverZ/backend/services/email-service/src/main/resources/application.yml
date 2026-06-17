@@ -1,0 +1,25 @@
+server:
+  port: 0
+spring:
+  application:
+    name: email-service
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: relevantz.servicedesk@gmail.com
+    password: hvcyefchhtpnqwbx
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-service:8761/eureka/
+
+  instance:
+    prefer-ip-address: true
+

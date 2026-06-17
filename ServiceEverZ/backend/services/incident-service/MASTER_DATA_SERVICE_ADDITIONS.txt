@@ -1,0 +1,45 @@
+# Master-Data-Service Additions for Incident Service
+# =====================================================
+# Add the two snippets below to your existing master-data-service.
+# Do NOT replace any existing code — these are pure additions.
+
+## 1. UserRepository.java — add this method
+
+    // Supports GET /api/master/users/support used by incident-service auto-assignment
+    List<User> findByDesignationAndStatus(User.Designation designation, User.Status status);
+
+    // Required imports (add to top of UserRepository.java if not present):
+    // import com.rvz.masterdataservice.entity.User;
+    // import java.util.List;
+
+
+## 2. UserController.java — paste this method before the closing brace
+
+    /**
+     * GET /api/master/users/support
+     *
+     * Returns all ACTIVE users with designation = SUPPORT.
+     * Called by incident-service (IncidentServiceImpl) for auto-assignment.
+     *
+     * NEW ENDPOINT — does NOT modify any existing endpoints.
+     */
+    @GetMapping("/support")
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getSupportPersonnel() {
+        log.info("GET /api/master/users/support");
+        List<User> supportUsers = userRepository
+                .findByDesignationAndStatus(User.Designation.SUPPORT, User.Status.ACTIVE);
+        List<UserResponse> data = supportUsers.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+        ApiResponse<List<UserResponse>> response = new ApiResponse<>();
+        response.setSuccess(true);
+        response.setMessage("Support personnel fetched successfully");
+        response.setData(data);
+        response.setTimestamp(LocalDateTime.now());
+        return ResponseEntity.ok(response);
+    }
+
+    // Required imports (add to top of UserController.java if not present):
+    // import java.time.LocalDateTime;
+    // import java.util.List;
+    // import java.util.stream.Collectors;

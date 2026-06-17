@@ -1,0 +1,6 @@
+package com.rvz.serviceeverz.enums;
+
+public enum ProblemStatus {
+	LOGGED, UNDER_INVESTIGATION, RCA_IN_PROGRESS, WORKAROUND_PROVIDED, PERMANENT_FIX_IN_PROGRESS, KNOWN_ERROR, RESOLVED,
+	CLOSED
+}

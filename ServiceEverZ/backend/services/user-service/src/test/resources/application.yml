@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: user-service-test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: ServiceEverZSecretKey2026@Chennai#Tamil$Nadu%Secure!Key&XYZ12345
+
+admin:
+  default:
+    email: admin@serviceeverz.com
+    password: Admin@1234
+    firstName: System
+    lastName: Admin
+    employeeId: 10001
