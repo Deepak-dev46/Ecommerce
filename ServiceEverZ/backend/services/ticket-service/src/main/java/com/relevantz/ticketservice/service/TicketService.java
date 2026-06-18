@@ -4,12 +4,14 @@ package com.relevantz.ticketservice.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.relevantz.ticketservice.client.UserServiceClient;
 import com.relevantz.ticketservice.dto.AddCommentRequest;
 import com.relevantz.ticketservice.dto.ApprovalResponse;
 import com.relevantz.ticketservice.dto.CancelTicketRequest;
@@ -42,6 +44,8 @@ import com.relevantz.ticketservice.repository.TicketRepository;
 @Transactional
 public class TicketService {
 
+	private static final String FALLBACK_REQUESTER_EMAIL = "santhoshraman7155@gmail.com";
+
 	private final TicketRepository ticketRepository;
 	private final TicketCommentRepository commentRepository;
 	private final TicketHistoryRepository historyRepository;
@@ -51,6 +55,8 @@ public class TicketService {
 	private final com.relevantz.ticketservice.client.ApprovalClient approvalClient;
 	private final TicketRelationshipService relationshipService;
 	private final TicketAccessPeriodRepository accessPeriodRepo;
+	private final CsatService csatService;
+	private final UserServiceClient userServiceClient;
 
 	@Value("${sla.hours.LOW:72}")
 	private int slaLow;
@@ -67,7 +73,8 @@ public class TicketService {
 			TicketHistoryRepository historyRepository, TicketAttachmentRepository attachmentRepository,
 			TicketQueueRepository queueRepository, TicketItemTimePeriodRepository timePeriodRepository,
 			com.relevantz.ticketservice.client.ApprovalClient approvalClient,
-			TicketRelationshipService relationshipService, TicketAccessPeriodRepository accessPeriodRepo) {
+			TicketRelationshipService relationshipService, TicketAccessPeriodRepository accessPeriodRepo,
+			CsatService csatService, UserServiceClient userServiceClient) {
 		this.ticketRepository = ticketRepository;
 		this.commentRepository = commentRepository;
 		this.historyRepository = historyRepository;
@@ -77,6 +84,8 @@ public class TicketService {
 		this.approvalClient = approvalClient;
 		this.relationshipService = relationshipService;
 		this.accessPeriodRepo = accessPeriodRepo;
+		this.csatService = csatService;
+		this.userServiceClient = userServiceClient;
 	}
 
 	/*
@@ -119,8 +128,8 @@ public class TicketService {
 			relationshipService.runDuplicateDetection(saved);
 		} catch (Exception e) {
 			// FIX 3: Always log detection failures
-			System.err.println("[WARN] Duplicate detection failed for ticket "
-					+ saved.getTicketId() + ": " + e.getMessage());
+			System.err.println(
+					"[WARN] Duplicate detection failed for ticket " + saved.getTicketId() + ": " + e.getMessage());
 		}
 
 		recordHistory(saved, TicketStatus.OPEN, "Ticket created");
@@ -171,11 +180,9 @@ public class TicketService {
 
 		Ticket ticket = findTicketOrThrow(ticketId);
 
-		if ("END_USER".equalsIgnoreCase(req.getAuthorRole())
-				&& !ticket.isAllowUserReply()) {
+		if ("END_USER".equalsIgnoreCase(req.getAuthorRole()) && !ticket.isAllowUserReply()) {
 
-			throw new BadRequestException(
-					"User replies are disabled for this ticket");
+			throw new BadRequestException("User replies are disabled for this ticket");
 		}
 
 		TicketComment comment = new TicketComment();
@@ -192,11 +199,8 @@ public class TicketService {
 	}
 
 	public List<CommentResponse> getCommentsByChannel(Long ticketId, String channel) {
-		return commentRepository
-				.findByTicketIdAndChannelOrderByCreatedAtAsc(ticketId, channel)
-				.stream()
-				.map(CommentResponse::from)
-				.toList();
+		return commentRepository.findByTicketIdAndChannelOrderByCreatedAtAsc(ticketId, channel).stream()
+				.map(CommentResponse::from).toList();
 	}
 
 	public List<CommentResponse> getComments(Long ticketId) {
@@ -211,6 +215,25 @@ public class TicketService {
 	public List<HistoryResponse> getHistory(Long ticketId) {
 		return historyRepository.findByTicketIdOrderByCreatedAtAsc(ticketId).stream().map(HistoryResponse::from)
 				.toList();
+	}
+
+	// ✅ NEW — called from TicketController POST /{id}/history
+	// Allows assignment-service and approval-service to write history rows
+	// without duplicating the TicketHistory entity
+	public void addHistoryEntry(Long ticketId, TicketStatus status, String remarks, Long changedBy,
+			String changedByName) {
+		try {
+			TicketHistory h = new TicketHistory();
+			h.setTicketId(ticketId);
+			h.setStatus(status);
+			h.setRemarks(remarks);
+			h.setChangedBy(changedBy != null ? changedBy : 0L);
+			h.setChangedByName(changedByName != null ? changedByName : "System");
+			h.setCreatedAt(LocalDateTime.now());
+			historyRepository.save(h);
+		} catch (Exception e) {
+			System.err.println("[WARN] addHistoryEntry failed for ticket " + ticketId + ": " + e.getMessage());
+		}
 	}
 
 	/*
@@ -268,8 +291,43 @@ public class TicketService {
 		if (next == TicketStatus.RESOLVED || next == TicketStatus.CLOSED) {
 			relationshipService.propagateDependencyResolution(saved.getTicketId());
 			relationshipService.autoCloseParentIfAllChildrenResolved(saved.getTicketId());
+
+			// ✅ FIX: Auto-trigger CSAT/feedback survey email to the requester.
+			// CsatService.triggerSurveyIfNeeded() is idempotent (safe on reopen/reclose).
+			try {
+				String requesterEmail = resolveRequesterEmail(saved.getUserId());
+				csatService.triggerSurveyIfNeeded(saved.getTicketId(), requesterEmail);
+			} catch (Exception e) {
+				// Never let a CSAT/email failure roll back the status update itself
+				System.err.println(
+						"⚠ Failed to trigger CSAT survey for ticket " + saved.getTicketId() + ": " + e.getMessage());
+			}
 		}
 		return TicketResponse.from(saved, List.of(), List.of(), List.of(), List.of(), null);
+	}
+
+	/*
+	 * ========================================================= RESOLVE REQUESTER
+	 * EMAIL (for CSAT survey dispatch) — Ticket has no email field, so look it up
+	 * via user-service. Falls back to a default if not found.
+	 * =========================================================
+	 */
+	private String resolveRequesterEmail(Long userId) {
+		if (userId == null) {
+			return FALLBACK_REQUESTER_EMAIL;
+		}
+		try {
+			Map<String, Object> body = userServiceClient.getUserById(userId);
+			if (body != null) {
+				Object email = body.get("email");
+				if (email instanceof String s && !s.isBlank()) {
+					return s;
+				}
+			}
+		} catch (Exception ex) {
+			System.err.println("⚠ user-service email lookup failed for userId=" + userId + ": " + ex.getMessage());
+		}
+		return FALLBACK_REQUESTER_EMAIL;
 	}
 
 	/*
@@ -307,26 +365,34 @@ public class TicketService {
 	 * ========================================================= ASSIGN
 	 * =========================================================
 	 */
-	public TicketResponse assignTicket(Long id, Long assigneeId, String name) {
+	public TicketResponse assignTicket(Long id, Long assigneeId, String name, String assignedByName, boolean isManual) {
 
 		Ticket ticket = findTicketOrThrow(id);
 
 		ticket.setAssigneeId(assigneeId);
 		ticket.setAssigneeName(name);
 
-		if (ticket.getStatus() == TicketStatus.OPEN) {
+		boolean wasOpen = ticket.getStatus() == TicketStatus.OPEN;
+		if (wasOpen) {
 			ticket.setStatus(TicketStatus.IN_PROGRESS);
 		}
 
 		Ticket saved = ticketRepository.save(ticket);
 
-		// ✅ FIX: Record history for assignment / status change to IN_PROGRESS
-		recordHistory(saved, saved.getStatus(),
-				"Ticket assigned to " + (name != null ? name : "agent") + " — status updated to " + saved.getStatus(),
-				assigneeId, name);
-		System.err.println(assigneeId);
-		System.err.println(name);
-		System.err.println(saved.getStatus());
+		String agentLabel = (name != null && !name.isBlank()) ? name : "Agent";
+
+		if (wasOpen) {
+// Row 1 — ASSIGNED
+			if (isManual && assignedByName != null && !assignedByName.isBlank()) {
+				recordHistory(saved, TicketStatus.ASSIGNED,
+						"Ticket assigned to " + agentLabel + " by ITSM Manager " + assignedByName, 0L, assignedByName);
+			} else {
+				recordHistory(saved, TicketStatus.ASSIGNED, "Ticket auto-assigned to " + agentLabel, 0L, "System");
+			}
+
+// Row 2 — IN_PROGRESS
+			recordHistory(saved, TicketStatus.IN_PROGRESS, "Status changed to In Progress", 0L, "System");
+		}
 
 		return TicketResponse.from(saved, List.of(), List.of(), List.of(), List.of(), null);
 	}
@@ -359,9 +425,9 @@ public class TicketService {
 
 	private int slaHoursFor(Priority p) {
 		return switch (p) {
-			case LOW -> slaLow;
-			case MEDIUM -> slaMedium;
-			case HIGH -> slaHigh;
+		case LOW -> slaLow;
+		case MEDIUM -> slaMedium;
+		case HIGH -> slaHigh;
 		};
 	}
 
@@ -375,16 +441,19 @@ public class TicketService {
 	 */
 
 	private void recordHistory(Ticket t, TicketStatus status, String msg, Long userId, String userName) {
-		TicketHistory h = new TicketHistory();
-
-		h.setTicketId(t.getTicketId());
-		h.setStatus(status);
-		h.setRemarks(msg);
-
-		h.setChangedBy(userId != null ? userId : 0L);
-		h.setChangedByName(userName != null ? userName : "System");
-
-		historyRepository.save(h);
+	    try {
+	        TicketHistory h = new TicketHistory();
+	        h.setTicketId(t.getTicketId());
+	        h.setStatus(status);
+	        h.setRemarks(msg);
+	        h.setChangedBy(userId != null ? userId : 0L);
+	        h.setChangedByName(userName != null ? userName : "System");
+	        h.setCreatedAt(LocalDateTime.now());
+	        historyRepository.save(h);
+	    } catch (Exception e) {
+	        System.err.println("[WARN] History write failed for ticket "
+	                + t.getTicketId() + ": " + e.getMessage());
+	    }
 	}
 
 	// ✅ Backward compatibility

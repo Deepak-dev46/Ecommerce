@@ -1,12 +1,27 @@
 package com.rvz.incidentservice.dto.response;
 
 import java.time.LocalDateTime;
-
+import java.util.List;
 /**
  * Response DTO returned to the frontend after creating / fetching an Incident.
  */
 public class IncidentResponse {
 
+      public static class AttachmentDto {
+        private Long   attachmentID;
+        private String filename;
+        private String mimeType;
+        private String file; // base64-encoded
+ 
+        public Long   getAttachmentID()       { return attachmentID; }
+        public void   setAttachmentID(Long v) { this.attachmentID = v; }
+        public String getFilename()           { return filename; }
+        public void   setFilename(String v)   { this.filename = v; }
+        public String getMimeType()           { return mimeType; }
+        public void   setMimeType(String v)   { this.mimeType = v; }
+        public String getFile()               { return file; }
+        public void   setFile(String v)       { this.file = v; }
+    }
     private Long   incidentId;
     private String ticketNumber;
     private String ticketType;
@@ -35,7 +50,9 @@ public class IncidentResponse {
     private String        incidentLocation;
     private String        officeLocation;
     private String        attachmentPath;
-
+    private List<AttachmentDto> attachments;
+public List<AttachmentDto> getAttachments()         { return attachments; }
+public void setAttachments(List<AttachmentDto> v)   { this.attachments = v; }
     // Assignment
     private Long   assignedTo;
     private String assignedToName;

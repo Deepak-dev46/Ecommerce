@@ -101,8 +101,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
 
         SupportPersonnelCapacity selected;
+        boolean isManual = request.getSupportPersonId() != null;
 
-        if (request.getSupportPersonId() != null) {
+        if (isManual) {
             selected = active.stream()
                     .filter(p -> p.getSupportPersonId().equals(request.getSupportPersonId()))
                     .findFirst()
@@ -132,6 +133,19 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         TicketAssignment saved = ticketRepo.save(assignment);
 
+        // ✅ Step 1 — Update ticket-service: writes ASSIGNED + IN_PROGRESS history rows
+        // (both rows written inside TicketService.assignTicket based on isManual flag)
+        try {
+            updateTicketAssignee(request.getTicketId(),
+                    selected.getSupportPersonId(), selected.getSupportPersonName(),
+                    isManual ? request.getAssignedByName() : null,   // ITSM manager name for manual
+                    isManual);
+        } catch (Exception e) {
+            log.warn("Could not update assignee in ticket-service for ticketId={}: {}",
+                    request.getTicketId(), e.getMessage());
+        }
+
+        // ✅ Step 3 — Email notification to assigned agent
         String email = resolveUserEmail(selected.getSupportPersonId());
         if (email != null) {
             sendEmail(email,
@@ -145,71 +159,50 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     // ── acknowledgeTicket ────────────────────────────────────────────────────
-    // @Override
-    // public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
-    //     TicketAssignment assignment = ticketRepo.findByTicketId(request.getTicketId())
-    //             .orElseThrow(() -> new ResourceNotFoundException(
-    //                     AssignmentConstants.TICKET_NOT_FOUND + request.getTicketId()));
-
-    //     if (!assignment.getSupportPersonId().equals(request.getSupportPersonId())) {
-    //         throw new AssignmentException("Only the assigned support person can acknowledge this ticket");
-    //     }
-
-    //     assignment.setStatus(AssignmentConstants.STATUS_OPEN);
-    //     assignment.setAcknowledgedAt(LocalDateTime.now());
-    //     TicketAssignment saved = ticketRepo.save(assignment);
-
-    //     // ── FIX: ensure ticket-service has the assignee set on acknowledge ──
-    //     updateTicketAssignee(assignment.getTicketId(),
-    //             assignment.getSupportPersonId(), assignment.getSupportPersonName());
-
-    //     String requesterEmail = resolveRequesterEmail(request.getTicketId());
-    //     if (requesterEmail != null) {
-    //         sendEmail(requesterEmail,
-    //             "Ticket #" + assignment.getTicketId() + " — Assigned and In Progress",
-    //             "Your IT service ticket #" + assignment.getTicketId()
-    //             + " has been assigned to " + assignment.getSupportPersonName()
-    //             + " and is now in progress.");
-    //     }
-
-    //     return mapper.toResponse(saved);
-    // }
-
     @Override
-@Transactional
-public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
-    TicketAssignment assignment = ticketRepo.findByTicketId(request.getTicketId())
-            .orElseThrow(() -> new ResourceNotFoundException(
-                    AssignmentConstants.TICKET_NOT_FOUND + request.getTicketId()));
+    @Transactional
+    public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
+        TicketAssignment assignment = ticketRepo.findByTicketId(request.getTicketId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        AssignmentConstants.TICKET_NOT_FOUND + request.getTicketId()));
  
-    if (!assignment.getSupportPersonId().equals(request.getSupportPersonId())) {
-        throw new AssignmentException("Only the assigned support person can acknowledge this ticket");
-    }
- 
-    assignment.setStatus(AssignmentConstants.STATUS_OPEN);
-    assignment.setAcknowledgedAt(LocalDateTime.now());
-    TicketAssignment saved = ticketRepo.save(assignment);
- 
-    // This now throws if ticket-service is down — transaction rolls back
-    updateTicketAssignee(assignment.getTicketId(),
-            assignment.getSupportPersonId(), assignment.getSupportPersonName());
- 
-    // email (keep non-fatal)
-    String requesterEmail = resolveRequesterEmail(request.getTicketId());
-    if (requesterEmail != null) {
-        try {
-            sendEmail(requesterEmail,
-                "Ticket #" + assignment.getTicketId() + " — Assigned and In Progress",
-                "Your IT service ticket #" + assignment.getTicketId()
-                + " has been assigned to " + assignment.getSupportPersonName()
-                + " and is now in progress.");
-        } catch (Exception e) {
-            log.warn("Email failed: {}", e.getMessage());
+        if (!assignment.getSupportPersonId().equals(request.getSupportPersonId())) {
+            throw new AssignmentException("Only the assigned support person can acknowledge this ticket");
         }
-    }
  
-    return mapper.toResponse(saved);
-}
+        assignment.setStatus(AssignmentConstants.STATUS_OPEN);
+        assignment.setAcknowledgedAt(LocalDateTime.now());
+        TicketAssignment saved = ticketRepo.save(assignment);
+ 
+        // ✅ updateTicketAssignee writes IN_PROGRESS history inside ticket-service.
+        // We do NOT write another ASSIGNED row here — that was already written
+        // in triggerAssignment(). This call only ensures the ticket record has
+        // the correct assigneeId/assigneeName if it was missed earlier.
+        try {
+            updateTicketAssignee(assignment.getTicketId(),
+                    assignment.getSupportPersonId(), assignment.getSupportPersonName(),
+                    null, false); // acknowledge = not a new manual assignment, skip ASSIGNED row
+        } catch (Exception e) {
+            log.warn("Could not update assignee in ticket-service on acknowledge for ticketId={}: {}",
+                    request.getTicketId(), e.getMessage());
+        }
+ 
+        // Email the requester (non-fatal)
+        String requesterEmail = resolveRequesterEmail(request.getTicketId());
+        if (requesterEmail != null) {
+            try {
+                sendEmail(requesterEmail,
+                    "Ticket #" + assignment.getTicketId() + " — Assigned and In Progress",
+                    "Your IT service ticket #" + assignment.getTicketId()
+                    + " has been assigned to " + assignment.getSupportPersonName()
+                    + " and is now in progress.");
+            } catch (Exception e) {
+                log.warn("Email failed: {}", e.getMessage());
+            }
+        }
+ 
+        return mapper.toResponse(saved);
+    }
 
     // ── checkAndReassignIfTimeout ────────────────────────────────────────────
     @Override
@@ -240,8 +233,19 @@ public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
         assignment.setReassigned(true);
         ticketRepo.save(assignment);
 
-        // ── FIX: update ticket-service with new assignee after reassignment ──
-        updateTicketAssignee(ticketId, next.getSupportPersonId(), next.getSupportPersonName());
+        // Write ASSIGNED history for the reassignment
+        writeHistory(
+            ticketId,
+            "ASSIGNED",
+            "Reassigned to " + next.getSupportPersonName()
+                + " (previous agent " + previousName + " did not acknowledge in time)",
+            0L,
+            "System"
+        );
+
+        // Update ticket-service with new assignee (auto reassign = not manual)
+        updateTicketAssignee(ticketId, next.getSupportPersonId(), next.getSupportPersonName(),
+                null, false);
 
         String managerEmail = resolveUserEmail(itsmManagerUserId);
         if (managerEmail != null) {
@@ -278,10 +282,8 @@ public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
                 .stream().map(mapper::toResponse).collect(Collectors.toList());
     }
 
-    // ── NEW: add support personnel capacity on role assignment ───────────────
     @Override
     public void addSupportPersonnelCapacity(Long userId, String fullName) {
-        // Avoid duplicates
         boolean exists = capacityRepo.findByActiveTrue()
                 .stream()
                 .anyMatch(c -> c.getSupportPersonId().equals(userId));
@@ -296,12 +298,13 @@ public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
         cap.setSupportPersonName(fullName != null && !fullName.isBlank() ? fullName : "Support Personnel");
         cap.setServiceType("IT");
         cap.setActive(true);
-        cap.setTotalResponseTimeHours(0.0);  // starts at 0 — no tickets assigned yet
-        cap.setTotalEstimatedHours(0.0);      // updated as tickets come in
+        cap.setTotalResponseTimeHours(0.0);
+        cap.setTotalEstimatedHours(0.0);
         capacityRepo.save(cap);
 
         log.info("Added support personnel capacity for userId={}, name={}", userId, fullName);
     }
+
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAllAssignments() {
@@ -329,35 +332,51 @@ public AssignmentResponse acknowledgeTicket(AcknowledgeRequest request) {
                 .toList();
     }
 
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Private helpers ──────────────────────────────────────────────────────
 
     /**
-     * Calls PUT /api/tickets/{ticketId}/assign on ticket-service so that
-     * assignee_id and assignee_name are stored in the ticket table.
-     * Non-fatal — logs a warning on failure.
+     * Calls PUT /api/tickets/{ticketId}/assign on ticket-service.
+     * Passes assignedByName and isManual so ticket-service can write:
+     *   ASSIGNED  → "Ticket assigned to Muthu by ITSM Manager Santhosh"
+     *   IN_PROGRESS → "Status changed to In Progress"
      */
-    // private void updateTicketAssignee(Long ticketId, Long assigneeId, String assigneeName) {
-    //     try {
-    //         Map<String, Object> body = new HashMap<>();
-    //         body.put("assigneeId",   assigneeId);
-    //         body.put("assigneeName", assigneeName != null ? assigneeName : "");
-    //         ticketClient.assignTicket(ticketId, body);
-    //         log.info("Ticket #{} assignee updated in ticket-service: {} (id={})",
-    //                 ticketId, assigneeName, assigneeId);
-    //     } catch (Exception ex) {
-    //         log.warn("Could not update assignee in ticket-service for ticketId={}: {}",
-    //                 ticketId, ex.getMessage());
-    //     }
-    // }
-    private void updateTicketAssignee(Long ticketId, Long assigneeId, String assigneeName) {
-    Map<String, Object> body = new HashMap<>();
-    body.put("assigneeId",   assigneeId);
-    body.put("assigneeName", assigneeName != null ? assigneeName : "");
-    ticketClient.assignTicket(ticketId, body);   // throws FeignException on failure
-    log.info("Ticket #{} assignee updated in ticket-service: {} (id={})",
-            ticketId, assigneeName, assigneeId);
-}
+    private void updateTicketAssignee(Long ticketId, Long assigneeId, String assigneeName,
+                                       String assignedByName, boolean isManual) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("assigneeId",    assigneeId);
+        body.put("assigneeName",  assigneeName != null ? assigneeName : "");
+        body.put("assignedByName", assignedByName != null ? assignedByName : "");
+        body.put("isManual",      isManual);
+        ticketClient.assignTicket(ticketId, body);
+        log.info("Ticket #{} assignee updated in ticket-service: {} (id={}) isManual={}",
+                ticketId, assigneeName, assigneeId, isManual);
+    }
+
+    /**
+     * ✅ Writes a history row to ticket-service via POST /api/tickets/{ticketId}/history.
+     * Non-fatal — logs a warning on failure so the main assignment flow is never blocked.
+     *
+     * @param ticketId      the ticket to write history for
+     * @param status        value from TicketStatus enum (e.g. "ASSIGNED", "IN_PROGRESS")
+     * @param remarks       human-readable description shown in the History tab
+     * @param changedBy     userId of the actor (0 = System)
+     * @param changedByName display name shown in the History tab
+     */
+    private void writeHistory(Long ticketId, String status, String remarks,
+                               Long changedBy, String changedByName) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status",        status);
+            body.put("remarks",       remarks);
+            body.put("changedBy",     changedBy != null ? changedBy : 0L);
+            body.put("changedByName", changedByName != null ? changedByName : "System");
+            ticketClient.addHistory(ticketId, body);
+            log.info("History written for ticketId={} status={} by={}", ticketId, status, changedByName);
+        } catch (Exception e) {
+            log.warn("Could not write history for ticketId={}: {}", ticketId, e.getMessage());
+        }
+    }
+
     private void sendEmail(String to, String subject, String body) {
         try {
             mailClient.sendEmail(new EmailRequest(to, subject, body, false));

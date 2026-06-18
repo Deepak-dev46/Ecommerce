@@ -8,5 +8,9 @@ public enum TicketStatus {
     CLOSED,
     REOPENED,
     CANCELLED,
-    PENDING_USER_ACK
+    PENDING_USER_ACK,
+    ASSIGNED ,
+    L1_APPROVED,
+    L2_APPROVED
+    
 }

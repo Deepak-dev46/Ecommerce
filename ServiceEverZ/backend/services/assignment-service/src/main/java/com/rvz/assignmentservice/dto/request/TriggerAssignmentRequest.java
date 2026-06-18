@@ -11,9 +11,12 @@ public class TriggerAssignmentRequest {
     private String priority;
     private Double estimatedHours;
     private Double responseTimeHours;
-    private Long   supportPersonId;   // null = auto-assign, non-null = manual assign
+    private Long   supportPersonId;
+    private String assignedByName;   // null = auto-assign, non-null = manual assign
 
-    public TriggerAssignmentRequest() {}
+   
+
+	public TriggerAssignmentRequest() {}
 
     public TriggerAssignmentRequest(Long ticketId, String priority) {
         this.ticketId          = ticketId;
@@ -46,4 +49,13 @@ public class TriggerAssignmentRequest {
 
     public Long   getSupportPersonId()            { return supportPersonId; }
     public void   setSupportPersonId(Long v)      { this.supportPersonId = v; }
+    
+    //added by team A
+    public String getAssignedByName() {
+		return assignedByName;
+	}
+
+	public void setAssignedByName(String assignedByName) {
+		this.assignedByName = assignedByName;
+	}
 }

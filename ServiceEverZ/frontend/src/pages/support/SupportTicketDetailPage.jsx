@@ -619,6 +619,132 @@ function ReopenModal({ open, onClose, onConfirm, loading }) {
     </Dialog>
   );
 }
+/* ─── Attachment Preview Modal ──────────────────────────────── */
+function AttachmentPreviewModal({ open, onClose, attachment }) {
+  const [objectUrl, setObjectUrl] = useState(null);
+ 
+  useEffect(() => {
+    if (!attachment?.file) { setObjectUrl(null); return; }
+    const byteChars = atob(attachment.file);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let j = 0; j < byteChars.length; j++) byteArray[j] = byteChars.charCodeAt(j);
+    const blob = new Blob([byteArray], { type: attachment.mimeType || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    setObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachment]);
+ 
+  const handleDownload = () => {
+    if (!objectUrl || !attachment) return;
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = attachment.filename || 'attachment';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+ 
+  const isImage = attachment?.mimeType?.startsWith('image/');
+  const isPdf   = attachment?.mimeType === 'application/pdf';
+ 
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+          border: '1px solid #E5E7EB',
+          height: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      }}
+    >
+      <DialogTitle sx={{ p: 0 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ px: 3, py: 2, borderBottom: '1px solid #F3F4F6', backgroundColor: '#FAFAFA' }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box sx={{
+              width: 36, height: 36, borderRadius: '10px',
+              backgroundColor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <AttachFileIcon sx={{ fontSize: 18, color: '#4F46E5' }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827', maxWidth: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {attachment?.filename || 'Attachment'}
+              </Typography>
+              <Typography sx={{ fontSize: '0.72rem', color: '#9CA3AF', mt: 0.2 }}>
+                {attachment?.mimeType || 'Unknown type'}
+              </Typography>
+            </Box>
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownload}
+              sx={{
+                borderRadius: '8px', borderColor: '#E5E7EB', color: '#374151', fontSize: '0.78rem',
+                '&:hover': { borderColor: '#27235C', color: '#27235C', backgroundColor: '#F5F5FF' },
+              }}
+            >
+              Download
+            </Button>
+            <IconButton onClick={onClose} size="small" sx={{ color: '#9CA3AF', '&:hover': { backgroundColor: '#F3F4F6' } }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </DialogTitle>
+ 
+      <DialogContent sx={{ flex: 1, p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', overflow: 'hidden' }}>
+        {!objectUrl ? (
+          <CircularProgress size={36} sx={{ color: '#27235C' }} />
+        ) : isImage ? (
+          <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3, overflow: 'auto' }}>
+            <img
+              src={objectUrl}
+              alt={attachment?.filename}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}
+            />
+          </Box>
+        ) : isPdf ? (
+          <iframe
+            src={objectUrl}
+            title={attachment?.filename}
+            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          />
+        ) : (
+          <Stack alignItems="center" spacing={2.5}>
+            <Box sx={{ width: 72, height: 72, borderRadius: '20px', backgroundColor: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AttachFileIcon sx={{ fontSize: 34, color: '#9CA3AF' }} />
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography sx={{ fontWeight: 700, color: '#374151', mb: 0.5 }}>Preview not available</Typography>
+              <Typography sx={{ fontSize: '0.83rem', color: '#9CA3AF' }}>This file type cannot be previewed. Download it to view.</Typography>
+            </Box>
+            <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleDownload}
+              sx={{ backgroundColor: '#27235C', borderRadius: '10px', '&:hover': { backgroundColor: '#1B193F' } }}>
+              Download File
+            </Button>
+          </Stack>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+ 
 
 /* ─── Empty Tab State ─────────────────────────────────────────── */
 function EmptyState({ icon, title, subtitle }) {
@@ -1162,7 +1288,8 @@ export default function SupportTicketDetailPage() {
   const [reopenLoading, setReopenLoading] = useState(false);
 
   const [allowUserReply, setAllowUserReply] = useState(true);
-
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+ 
   const commentsEndRef = useRef(null);
 
   const loadAll = useCallback(async () => {
@@ -1426,22 +1553,54 @@ export default function SupportTicketDetailPage() {
           </Paper>
 
           <Paper sx={{ p: 2.5, borderRadius: '14px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)', border: '1px solid #E5E7EB' }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Attachments</Typography>
-              <Badge badgeContent={ticket.attachments?.length || 0} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
-                <AttachFileIcon sx={{ fontSize: 16, color: '#9CA3AF' }} />
-              </Badge>
-            </Stack>
-            <Divider sx={{ mb: 1.5, borderColor: '#F3F4F6' }} />
-            {ticket.attachments?.length > 0 ? (
-              ticket.attachments.map((a, i) => (
-                <Stack key={i} direction="row" spacing={1} alignItems="center" sx={{ py: 0.8, px: 1, borderRadius: '8px', '&:hover': { backgroundColor: '#F9FAFB' } }}>
-                  <AttachFileIcon sx={{ fontSize: 14, color: '#9CA3AF' }} />
-                  <Typography sx={{ fontSize: '0.78rem', color: '#3B82F6', textDecoration: 'none', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>{a.fileName || `Attachment ${i + 1}`}</Typography>
-                </Stack>
-              ))
-            ) : <Typography sx={{ fontSize: '0.78rem', color: '#9CA3AF', textAlign: 'center', py: 1 }}>No attachments</Typography>}
-          </Paper>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Attachments</Typography>
+                <Badge badgeContent={ticket.attachments?.length || 0} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                  <AttachFileIcon sx={{ fontSize: 16, color: '#9CA3AF' }} />
+                </Badge>
+              </Stack>
+              <Divider sx={{ mb: 1.5, borderColor: '#F3F4F6' }} />
+              {ticket.attachments?.length > 0 ? (
+                ticket.attachments.map((a, i) => (
+                  <Stack key={a.attachmentID || i} direction="row" spacing={1} alignItems="center" justifyContent="space-between"
+                    sx={{ py: 0.9, px: 1, borderRadius: '8px', '&:hover': { backgroundColor: '#F5F5FF' }, transition: 'background-color 0.15s' }}
+                  >
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ overflow: 'hidden', flex: 1, cursor: 'pointer' }}
+                      onClick={() => setPreviewAttachment(a)}
+                    >
+                      <AttachFileIcon sx={{ fontSize: 14, color: '#9CA3AF', flexShrink: 0 }} />
+                      <Typography sx={{ fontSize: '0.78rem', color: '#3B82F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}>
+                        {a.filename || `Attachment ${i + 1}`}
+                      </Typography>
+                    </Stack>
+                    <Tooltip title="Download">
+                      <IconButton size="small" onClick={() => {
+                        const byteChars = atob(a.file);
+                        const byteArray = new Uint8Array(byteChars.length);
+                        for (let j = 0; j < byteChars.length; j++) byteArray[j] = byteChars.charCodeAt(j);
+                        const blob = new Blob([byteArray], { type: a.mimeType || 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url; link.download = a.filename || `attachment-${i + 1}`;
+                        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      }}>
+                        <DownloadIcon sx={{ fontSize: 15, color: '#6B7280' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                ))
+              ) : (
+                <Typography sx={{ fontSize: '0.78rem', color: '#9CA3AF', textAlign: 'center', py: 1 }}>No attachments</Typography>
+              )}
+            </Paper>
+ 
+            <AttachmentPreviewModal
+              open={Boolean(previewAttachment)}
+              onClose={() => setPreviewAttachment(null)}
+              attachment={previewAttachment}
+            />
+   
 
           <Paper sx={{ p: 2.5, borderRadius: '14px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)', border: '1px solid #E5E7EB' }}>
             <Typography sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5 }}>Requester</Typography>

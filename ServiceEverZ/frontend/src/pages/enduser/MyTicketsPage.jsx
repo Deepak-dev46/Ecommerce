@@ -14,7 +14,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import DownloadIcon from '@mui/icons-material/Download';
-
+ 
 /* ── Status chip colours ─────────────────────────────────────── */
 const STATUS_COLOR = {
   DRAFT: { color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
@@ -24,31 +24,36 @@ const STATUS_COLOR = {
   RESOLVED: { color: '#24A148', bg: '#EDFAF2', border: '#B7EAC9' },
   CLOSED: { color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
   CANCELLED: { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  // incident statuses
-  New: { color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-  'In Progress': { color: '#E2B93B', bg: '#FDF8EC', border: '#F0DFA0' },
-  Resolved: { color: '#24A148', bg: '#EDFAF2', border: '#B7EAC9' },
-  Closed: { color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
 };
-
+ 
 const PRIORITY_COLOR = {
   LOW: { color: '#24A148', bg: '#EDFAF2' },
   MEDIUM: { color: '#E2B93B', bg: '#FDF8EC' },
   HIGH: { color: '#E85D26', bg: '#FEF0EB' },
   CRITICAL: { color: '#E01950', bg: '#FDEDF2' },
 };
-
+const STATUS_LABELS = {
+  OPEN: 'Open', IN_PROGRESS: 'In Progress', ON_HOLD: 'On Hold',
+  RESOLVED: 'Resolved', CLOSED: 'Closed', REOPENED: 'Reopened',
+  CANCELLED: 'Cancelled', PENDING_USER_ACK: 'Pending User Ack',
+  ASSIGNED: 'Assigned', DRAFT: 'Draft', SUBMITTED: 'Submitted',
+  L1_APPROVED: 'L1 Approved', L2_APPROVED: 'L2 Approved',
+};
+ 
 function StatusBadge({ status }) {
-  const cfg = STATUS_COLOR[status] || STATUS_COLOR.OPEN;
+  const key = status?.toUpperCase();
+  const cfg = STATUS_COLOR[key] || STATUS_COLOR.OPEN;
+  const label = STATUS_LABELS[key] || status || '—';
   return (
-    <MuiChip label={status || '—'} size="small"
+    <MuiChip label={label} size="small"
       sx={{
         fontWeight: 600, fontSize: '0.72rem', height: 22,
         color: cfg.color, backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`
       }} />
   );
 }
-
+ 
+ 
 function PriorityBadge({ priority }) {
   if (!priority) return <span style={{ color: '#9CA3AF' }}>—</span>;
   // priority can be a plain string ("High") or an object with .name
@@ -62,7 +67,7 @@ function PriorityBadge({ priority }) {
       }} />
   );
 }
-
+ 
 function TypeBadge({ type }) {
   const isIncident = type === 'Incident';
   return (
@@ -75,7 +80,7 @@ function TypeBadge({ type }) {
       }} />
   );
 }
-
+ 
 function exportToCSV(tickets, filename = 'my-tickets.csv') {
   const headers = ['Ticket #', 'Type', 'Subject', 'Category', 'Sub-Category', 'Item', 'Status', 'Priority', 'Created At'];
   const rows = tickets.map(t => {
@@ -98,10 +103,10 @@ function exportToCSV(tickets, filename = 'my-tickets.csv') {
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
-
+ 
 // All possible status tabs — empty ones are hidden automatically
-const STATUS_TABS = ['ALL', 'DRAFT', 'SUBMITTED', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'New', 'In Progress', 'Resolved', 'Closed'];
-
+const STATUS_TABS = ['ALL', 'DRAFT', 'SUBMITTED', 'ASSIGNED', 'OPEN', 'IN_PROGRESS', 'ON_HOLD', 'PENDING_USER_ACK', 'RESOLVED', 'CLOSED'];
+ 
 export default function MyTicketsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -113,7 +118,7 @@ export default function MyTicketsPage() {
   const [statusTab, setStatusTab] = useState('ALL');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-
+ 
   const load = useCallback(async () => {
     if (!user?.userId) return;
     setLoading(true);
@@ -125,25 +130,28 @@ export default function MyTicketsPage() {
         _id: t.id,
         _type: t.ticketType || 'Ticket',
       }));
-
+ 
       // ── 2. Fetch incident tickets ─────────────────────────────────────
       const incidentData = await incidentApi.getByUser(user.userId).catch(() => []);
+      console.log('incidentData raw:', incidentData);  
       const incidents = (Array.isArray(incidentData) ? incidentData : []).map(inc => ({
-        ...inc,
-        id: inc.incidentId,          // align to the field everything else uses
-        _id: inc.incidentId,
-        _type: 'Incident',
-        // map to common display field names
-        category: inc.categoryName || null,
-        subCategory: inc.subCategoryName || null,
-        item: null,
-      }));
-
+  ...inc,
+  id: inc.incidentId,
+  _id: inc.incidentId,
+  _type: 'Incident',
+  // Normalize status to UPPER_SNAKE_CASE so tab filters match
+  status: inc.status ? inc.status.trim().toUpperCase().replace(/\s+/g, '_') : inc.status,
+  // map to common display field names
+  category: inc.categoryName || null,
+  subCategory: inc.subCategoryName || null,
+  item: null,
+}));
+ 
       const all = [...normalised, ...incidents]
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+ 
       setTickets(all);
-
+ 
       // ── 3. Approval info (only for non-draft service tickets) ─────────
       const approvalMap = {};
       await Promise.allSettled(
@@ -153,7 +161,7 @@ export default function MyTicketsPage() {
           else if (ap) approvalMap[t._id] = ap;
         })
       );
-
+ 
       setApprovals(approvalMap);
     } catch (e) {
       toast.error('Failed to load tickets');
@@ -161,13 +169,13 @@ export default function MyTicketsPage() {
       setLoading(false);
     }
   }, [user?.userId]);
-
+ 
   useEffect(() => {
     load();
   }, [load]);
-
-
-
+ 
+ 
+ 
   const submitDraft = async (e, id) => {
     e.stopPropagation();
     setSubmitting(id);
@@ -181,11 +189,11 @@ export default function MyTicketsPage() {
       setSubmitting(null);
     }
   };
-
+ 
   const editDraft = (ticket) => {
     navigate('/user/service-catalog', { state: { draftTicket: ticket } });
   };
-
+ 
   const viewTicket = (t) => {
     if (t._type === 'Incident') {
       navigate(`/user/incidents/${t._id}`);
@@ -193,7 +201,7 @@ export default function MyTicketsPage() {
       navigate(`/user/tickets/${t._id}`);
     }
   };
-
+ 
   const filtered = tickets
     .filter(t => statusTab === 'ALL' || t.status === statusTab)
     .filter(t => {
@@ -203,11 +211,11 @@ export default function MyTicketsPage() {
         || (t.subject || '').toLowerCase().includes(q)
         || (t.category || '').toLowerCase().includes(q);
     });
-
+ 
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, backgroundColor: '#F4F5F9', minHeight: '100vh' }}>
-
+ 
       {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -231,13 +239,13 @@ export default function MyTicketsPage() {
           Export CSV
         </Button>
       </Stack>
-
+ 
       {/* Search */}
       <TextField fullWidth size="small" placeholder="Search by ticket number, subject, category..."
         value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
         sx={{ mb: 2, maxWidth: 460, backgroundColor: '#fff', borderRadius: 1 }}
         InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: '#6b6b8a' }} /></InputAdornment> }} />
-
+ 
       {/* Status tabs — only show tabs that have at least one ticket */}
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         {STATUS_TABS.map(tab => {
@@ -257,7 +265,7 @@ export default function MyTicketsPage() {
           );
         })}
       </Box>
-
+ 
       {/* Table */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -291,7 +299,7 @@ export default function MyTicketsPage() {
                   const ap = approvals[t._id];
                   const isDraft = t.status === 'DRAFT';
                   const isIncident = t._type === 'Incident';
-
+ 
                   return (
                     <TableRow key={`${t._type}-${t._id}`}
                       onClick={() => !isDraft && viewTicket(t)}
@@ -300,7 +308,7 @@ export default function MyTicketsPage() {
                         '&:hover': { backgroundColor: isDraft ? 'inherit' : '#F9FAFB' },
                         '&:last-child td': { border: 0 }
                       }}>
-
+ 
                       {/* Ticket Number + date + draft actions */}
                       <TableCell sx={{ py: 1.5 }}>
                         <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.8rem', color: '#27235C' }}>
@@ -331,12 +339,12 @@ export default function MyTicketsPage() {
                           </Stack>
                         )}
                       </TableCell>
-
+ 
                       {/* Type */}
                       <TableCell sx={{ py: 1.5 }}>
                         <TypeBadge type={t._type} />
                       </TableCell>
-
+ 
                       {/* Subject + sub-category */}
                       <TableCell sx={{ py: 1.5, maxWidth: 220 }}>
                         <Typography sx={{ fontWeight: 600, fontSize: '0.83rem', color: '#111827' }} noWrap>
@@ -348,36 +356,36 @@ export default function MyTicketsPage() {
                           {isIncident && t.incidentLocation ? ` · ${t.incidentLocation}` : ''}
                         </Typography>
                       </TableCell>
-
+ 
                       {/* Category */}
                       <TableCell sx={{ fontSize: '0.8rem', color: '#374151', py: 1.5 }}>
                         {t.category || t.categoryName || 'Network'}
                       </TableCell>
-
+ 
                       {/* L1 Approver */}
                       <TableCell sx={{ fontSize: '0.8rem', color: '#374151', py: 1.5 }}>
                         {isIncident
                           ? <span style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>N/A</span>
                           : (ap?.l1ApproverName || '—')}
                       </TableCell>
-
+ 
                       {/* L2 Approver */}
                       <TableCell sx={{ fontSize: '0.8rem', color: '#374151', py: 1.5 }}>
                         {isIncident
                           ? <span style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>N/A</span>
                           : (ap?.l2ApproverName || '—')}
                       </TableCell>
-
+ 
                       {/* Status */}
                       <TableCell sx={{ py: 1.5 }}>
                         <StatusBadge status={t.status} />
                       </TableCell>
-
+ 
                       {/* Priority */}
                       <TableCell sx={{ py: 1.5 }}>
                         <PriorityBadge priority={t.priority} />
                       </TableCell>
-
+ 
                       {/* Created */}
                       <TableCell sx={{ fontSize: '0.78rem', color: '#6B7280', py: 1.5 }}>
                         {formatDate(t.createdAt)}

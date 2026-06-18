@@ -174,8 +174,8 @@ public class IncidentServiceImpl implements IncidentService {
 
         // Count open incidents per person
         Map<Long, Long> loadMap = incidentRepository.findAll().stream()
-                .filter(i -> !"Resolved".equalsIgnoreCase(i.getStatus())
-                          && !"Closed".equalsIgnoreCase(i.getStatus())
+                .filter(i -> !"RESOLVED".equalsIgnoreCase(i.getStatus())
+                          && !"CLOSED".equalsIgnoreCase(i.getStatus())
                           && i.getAssignedTo() != null)
                 .collect(Collectors.groupingBy(Incident::getAssignedTo,
                         Collectors.counting()));
@@ -277,7 +277,31 @@ public class IncidentServiceImpl implements IncidentService {
         r.setResolutionNotes(i.getResolutionNotes());
         r.setCreatedAt(i.getCreatedAt());
         r.setUpdatedAt(i.getUpdatedAt());
+ 
+        // Load attachments and base64-encode for frontend
+        if (i.getIncidentId() != null) {
+            try {
+                List<IncidentAttachment> atts =
+                        attachmentRepository.findAllByIncidentId(i.getIncidentId());
+                List<IncidentResponse.AttachmentDto> dtos = atts.stream()
+                        .map(a -> {
+                            IncidentResponse.AttachmentDto dto = new IncidentResponse.AttachmentDto();
+                            dto.setAttachmentID(a.getId());
+                            dto.setFilename(a.getFileName());
+                            dto.setMimeType(a.getFileType());
+                            if (a.getFileData() != null) {
+                                dto.setFile(java.util.Base64.getEncoder()
+                                        .encodeToString(a.getFileData()));
+                            }
+                            return dto;
+                        })
+                        .collect(Collectors.toList());
+                r.setAttachments(dtos);
+            } catch (Exception ignored) {}
+        }
+ 
         return r;
+ 
     }
 
 	@Override
@@ -289,13 +313,13 @@ public IncidentResponse updateIncident(Long incidentId, UpdateIncidentRequest re
     //     throw new com.rvz.incidentservice.exception.IncidentException("Cannot update a Closed incident");
     // }
  
-    if ("Closed".equalsIgnoreCase(incident.getStatus())) {
+    if ("CLOSED".equalsIgnoreCase(incident.getStatus())) {
         throw new com.rvz.incidentservice.exception.IncidentException("Cannot update a Closed incident");
     }
     // When resolving: set status to Pending_User_Ack
     if ("Pending_User_Ack".equalsIgnoreCase(request.getStatus()) ||
         "PENDING_USER_ACK".equalsIgnoreCase(request.getStatus())) {
-        request.setStatus("Pending_User_Ack");
+        request.setStatus("PENDING_USER_ACK");
     }
     // Partial update — only set non-null fields
     if (request.getStatus()           != null) incident.setStatus(request.getStatus());
@@ -303,7 +327,7 @@ public IncidentResponse updateIncident(Long incidentId, UpdateIncidentRequest re
     if (request.getAssignedTo()       != null) {
         // Auto-promote from New → In Progress when assigning
         if ("New".equalsIgnoreCase(incident.getStatus())) {
-            incident.setStatus("In Progress");
+            incident.setStatus("IN_PROGRESS");
         }
         incident.setAssignedTo(request.getAssignedTo());
     }
