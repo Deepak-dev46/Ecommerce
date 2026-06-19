@@ -37,20 +37,20 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import TuneIcon from '@mui/icons-material/Tune'; // ✅ CHANGE 4\
- 
- 
+
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import SupportCreateTicketModal from '../../pages/support/SupportCreateTicketModal';
 import { userAxios } from '../../api/axiosInstance';
- 
+
 export const SIDEBAR_WIDTH = 260;
 export const COLLAPSED_W = 72;
- 
+
 const fontStack = '"Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", sans-serif';
- 
+
 // ── Nav configs ✅ CHANGE 3 — featureKey added to every item ─────────────────
- 
+
 const ADMIN_NAV = [
   { label: 'Dashboard', icon: DashboardIcon, path: '/dashboard', featureKey: 'ADMIN_DASHBOARD' },
   { label: 'User management', icon: PeopleIcon, path: '/users', featureKey: 'ADMIN_USERS' },
@@ -59,13 +59,13 @@ const ADMIN_NAV = [
   { label: 'Reports', icon: AssessmentIcon, path: '/report', featureKey: 'ADMIN_REPORTS' },
   { label: 'Control panel', icon: TuneIcon, path: '/feature-control', featureKey: 'ADMIN_FEAT_CTRL' },
 ];
- 
+
 const RMO_NAV = [
   { label: 'RMO Overview', icon: ManageAccountsIcon, path: '/rmo/dashboard', featureKey: 'RMO_DASHBOARD' },
   { label: 'Projects', icon: ProjectIcon, path: '/rmo/projects', featureKey: 'RMO_PROJECTS' },
   { label: 'Resources', icon: ResourceIcon, path: '/rmo/resources', featureKey: 'RMO_RESOURCES' },
 ];
- 
+
 const END_USER_NAV = [
   { label: 'Dashboard', icon: DashboardIcon, path: '/user/dashboard', featureKey: 'EU_DASHBOARD' },
   { label: 'Create ticket', icon: CreateIcon, path: '/user/service-catalog', featureKey: 'EU_CREATE_TICKET' },
@@ -73,7 +73,7 @@ const END_USER_NAV = [
   { label: 'Drafts', icon: HistoryIcon, path: '/user/drafts', featureKey: 'EU_DRAFTS' },
   { label: 'Knowledge base', icon: CatalogIcon, path: '/user/knowledgebase', featureKey: 'EU_KB' },
 ];
- 
+
 const ITSM_NAV = [
   { label: 'Dashboard', icon: DashboardIcon, path: '/itsm/overview', featureKey: 'ITSM_DASHBOARD' },
   { label: 'My tickets', icon: TicketIcon, path: '/itsm/Mytickets', featureKey: 'ITSM_TICKETS' },
@@ -91,7 +91,7 @@ const ITSM_NAV = [
   { label: 'Change management', icon: PublishedWithChangesIcon, path: '/itsm/changemanagement', featureKey: 'ITSM_CHANGE' },
   { label: 'Reports', icon: ReportsIcon, path: '/itsm/reports', featureKey: 'ITSM_REPORTS' },
 ];
- 
+
 const SUPPORT_NAV = [
   { label: 'Dashboard', icon: DashboardIcon, path: '/support/dashboard', featureKey: 'SUPPORT_DASHBOARD' },
   { label: 'Acknowledge', icon: SupportAgentIcon, path: '/support/acknowledge', featureKey: 'SUPPORT_ACKNOWLEDGE' },
@@ -106,33 +106,31 @@ const SUPPORT_NAV = [
   { label: 'Backup schedule', icon: MergeTypeIcon, path: '/support/backupschedule', featureKey: 'SUPPORT_BACKUP' },
   { label: 'Change plan', icon: CompareArrowsIcon, path: '/support/changeplan', featureKey: 'SUPPORT_CHANGE' },
 ];
+
+const APPROVALS_NAV = [
+  { label: 'Pending Approvals', icon: AssignmentTurnedInIcon, path: '/approvals/queue' },
  
-// const APPROVAL_NAV = [
-//   { label: 'Approval queue', icon: AssignmentTurnedInIcon, path: '/approvals/queue', featureKey: 'L1_QUEUE' },
-//   { label: 'History', icon: HistoryIcon, path: '/approvals/history', featureKey: 'L1_HISTORY' },
- 
+];
+// // ✅ REPLACE with these two separate arrays:
+// const L1_NAV = [
+//   { label: 'Approval queue', icon: AssignmentTurnedInIcon, path: '/l1/approvals', featureKey: 'L1_QUEUE' },
+//   { label: 'History', icon: HistoryIcon, path: '/l1/history', featureKey: 'L1_HISTORY' },
 // ];
- 
-// ✅ REPLACE with these two separate arrays:
-const L1_NAV = [
-  { label: 'Approval queue', icon: AssignmentTurnedInIcon, path: '/l1/approvals', featureKey: 'L1_QUEUE' },
-  { label: 'History', icon: HistoryIcon, path: '/l1/history', featureKey: 'L1_HISTORY' },
-];
- 
-const L2_NAV = [
-  { label: 'Approval queue', icon: AssignmentTurnedInIcon, path: '/l2/approvals', featureKey: 'L2_QUEUE' },
-  { label: 'History', icon: HistoryIcon, path: '/l2/history', featureKey: 'L2_HISTORY' },
-];
- 
+
+// const L2_NAV = [
+//   { label: 'Approval queue', icon: AssignmentTurnedInIcon, path: '/l2/approvals', featureKey: 'L2_QUEUE' },
+//   { label: 'History', icon: HistoryIcon, path: '/l2/history', featureKey: 'L2_HISTORY' },
+// ];
+
 const RESOURCE_OWNER_NAV = [
   { label: 'Pending approvals', icon: SupervisorAccountIcon, path: '/resource-owner/dashboard', featureKey: 'RO_PENDING' },
   { label: 'History', icon: HistoryIcon, path: '/resource-owner/history', featureKey: 'RO_HISTORY' },
 ];
- 
+
 // ── NavItem ───────────────────────────────────────────────────────────────────
 const NavItem = ({ item, open, active, onClick }) => {
   const navigate = useNavigate();
- 
+
   const handleItemPress = () => {
     if (onClick) {
       onClick();
@@ -140,7 +138,7 @@ const NavItem = ({ item, open, active, onClick }) => {
       navigate(item.path);
     }
   };
- 
+
   return (
     <Tooltip title={!open ? item.label : ''} placement="right" arrow>
       <ListItem
@@ -171,7 +169,7 @@ const NavItem = ({ item, open, active, onClick }) => {
             borderRadius: '0 4px 4px 0',
           }} />
         )}
- 
+
         <ListItemIcon sx={{
           minWidth: open ? 34 : 'auto',
           color: active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.55)',
@@ -181,7 +179,7 @@ const NavItem = ({ item, open, active, onClick }) => {
         }}>
           <item.icon />
         </ListItemIcon>
- 
+
         <AnimatePresence mode="wait">
           {open && (
             <motion.div
@@ -209,7 +207,7 @@ const NavItem = ({ item, open, active, onClick }) => {
     </Tooltip>
   );
 };
- 
+
 // ── Section label ─────────────────────────────────────────────────────────────
 const SectionLabel = ({ label, open, badge }) =>
   open ? (
@@ -234,7 +232,7 @@ const SectionLabel = ({ label, open, badge }) =>
       <Divider sx={{ width: '40%', borderColor: 'rgba(255,255,255,0.08)' }} />
     </Box>
   );
- 
+
 // ── SidebarContent ────────────────────────────────────────────────────────────
 const SidebarContent = ({ open }) => {
   const { pathname } = useLocation();
@@ -242,7 +240,7 @@ const SidebarContent = ({ open }) => {
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(null);
- 
+
   const isAdmin = hasRole('ADMIN');
   const isRMO = hasRole('RMO');
   const isEndUser = hasRole('END_USER');
@@ -251,21 +249,22 @@ const SidebarContent = ({ open }) => {
   const isL1 = hasEffectiveRole('APPROVAL_MANAGER_L1');
   const isL2 = hasEffectiveRole('APPROVAL_MANAGER_L2');
   const isRO = hasEffectiveRole('RESOURCE_OWNER');
- 
+
   const managerRoleCount = [isITSM, isSupport, isL1, isL2, isRO].filter(Boolean).length;
- 
+
   const consoleLabel = (() => {
     if (isAdmin) return 'Admin Console';
     if (isRMO) return 'RMO Console';
     if (isITSM) return 'ITSM Console';
     if (isSupport) return 'Support Console';
-    if (isL1 && isL2) return 'Manager Portal';
-    if (isL1) return 'L1 Manager Portal';
-    if (isL2) return 'L2 Manager Portal';
+    // if (isL1 && isL2) return 'Manager Portal';
+    // if (isL1) return 'L1 Manager Portal';
+    // if (isL2) return 'L2 Manager Portal';
+    if (isL1 || isL2) return 'Approvals Manager';
     if (isRO) return 'Resource Owner';
     return 'User Portal';
   })();
- 
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -278,11 +277,11 @@ const SidebarContent = ({ open }) => {
       setLoading(false);
     }
   };
- 
+
   useEffect(() => { fetchProfile(); }, []);
- 
+
   const isActive = (path) => pathname === path || pathname.startsWith(path + '/');
- 
+
   // ✅ CHANGE 2 — filters nav items by canAccess featureKey
   const renderSection = (label, navItems, show, badge) => {
     if (!show) return null;
@@ -299,13 +298,13 @@ const SidebarContent = ({ open }) => {
       </>
     );
   };
- 
+
   return (
     <Box sx={{
       height: '100%', backgroundColor: '#1D1B44',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
- 
+
       {/* ── Brand Logo Header ─────────────────────────────────────────── */}
       <Box sx={{
         display: 'flex', alignItems: 'center',
@@ -354,15 +353,15 @@ const SidebarContent = ({ open }) => {
         '&::-webkit-scrollbar-track': { background: 'transparent' },
         '&::-webkit-scrollbar-thumb': { background: 'rgba(255, 255, 255, 0.12)', borderRadius: '10px' },
       }}>
- 
+
         {renderSection('Admin', ADMIN_NAV, isAdmin)}
         {isAdmin && isRMO && open && <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />}
- 
+
         {renderSection('RMO', RMO_NAV, isRMO)}
         {isITSM && isRMO && open && <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />}
- 
+
         {renderSection('ITSM', ITSM_NAV, isITSM)}
- 
+
         {isSupport && (
           <>
             {(isAdmin || isRMO || isITSM) && open && <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />}
@@ -381,7 +380,7 @@ const SidebarContent = ({ open }) => {
             <SupportCreateTicketModal open={createTicketOpen} onClose={() => setCreateTicketOpen(false)} />
           </>
         )}
- 
+
         {/* {isApprover && (
           <>
             {(isAdmin || isRMO || isITSM || isSupport) && open && (
@@ -390,9 +389,9 @@ const SidebarContent = ({ open }) => {
             {renderSection('Approvals', APPROVAL_NAV, isApprover)}
           </>
         )} */}
- 
- 
-        {isL1 && (
+
+
+        {/* {isL1 && (
           <>
             {(isAdmin || isRMO || isITSM || isSupport) && open && (
               <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
@@ -408,8 +407,16 @@ const SidebarContent = ({ open }) => {
             )}
             {renderSection('L2 Approvals', L2_NAV, isL2)}
           </>
+        )} */}
+
+        {(isL1 || isL2) && (
+          <>
+            {(isAdmin || isRMO || isITSM || isSupport) && open && (
+              <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
+            )}
+            {renderSection('Approvals', APPROVALS_NAV, true)}
+          </>
         )}
- 
         {isRO && (
           <>
             {(isAdmin || isRMO || isITSM || isSupport || isApprover) && open && (
@@ -418,7 +425,7 @@ const SidebarContent = ({ open }) => {
             {renderSection('Resource Owner', RESOURCE_OWNER_NAV, isRO)}
           </>
         )}
- 
+
         {isEndUser && (
           <>
             {managerRoleCount > 0 && open && (
@@ -432,7 +439,7 @@ const SidebarContent = ({ open }) => {
           </>
         )}
       </List>
- 
+
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <Box sx={{
         borderTop: '1px solid rgba(255, 255, 255, 0.08)',
@@ -469,13 +476,13 @@ const SidebarContent = ({ open }) => {
     </Box>
   );
 };
- 
+
 // ── Sidebar shell ─────────────────────────────────────────────────────────────
 const Sidebar = ({ open, mobileOpen, onMobileClose }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const width = open ? SIDEBAR_WIDTH : COLLAPSED_W;
- 
+
   if (isMobile) {
     return (
       <Drawer
@@ -487,7 +494,7 @@ const Sidebar = ({ open, mobileOpen, onMobileClose }) => {
       </Drawer>
     );
   }
- 
+
   return (
     <Drawer
       variant="permanent"
@@ -505,7 +512,6 @@ const Sidebar = ({ open, mobileOpen, onMobileClose }) => {
     </Drawer>
   );
 };
- 
+
 export default Sidebar;
- 
- 
+
