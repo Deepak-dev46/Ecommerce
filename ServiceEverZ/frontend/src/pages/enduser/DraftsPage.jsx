@@ -13,17 +13,17 @@ import { useAuth } from '../../context/AuthContext';
 import CreateTicketWrapper from './CreateTicketWrapper';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { deleteDraft } from '../../api/ticketApi';
- 
+
 
 const GATEWAY = 'http://localhost:8080';
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sez_token') || ''}` });
- 
+
 const fetchJson = async (url) => {
   const res = await fetch(url, { headers: authHeader() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
- 
+
 const postJson = async (url, body = {}) => {
   const res = await fetch(url, {
     method: 'POST',
@@ -33,21 +33,21 @@ const postJson = async (url, body = {}) => {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
- 
+
 const fmtDate = (d) => d
   ? new Date(d).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
   : '—';
- 
+
 const PRIORITY_COLOR = {
   HIGH: { bg: '#FEF0EB', color: '#C2410C' },
   MEDIUM: { bg: '#FEF9C3', color: '#854D0E' },
   LOW: { bg: '#EDFAF2', color: '#166534' },
   CRITICAL: { bg: '#FEE2E2', color: '#991B1B' },
 };
- 
+
 export default function DraftsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -57,10 +57,10 @@ export default function DraftsPage() {
   const [submitting, setSubmitting] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
- 
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
- 
+
   // const load = useCallback(async () => {
   //   if (!user?.userId) return;
   //   setLoading(true);
@@ -75,7 +75,7 @@ export default function DraftsPage() {
   //     setDrafts(rawList);
   //     const list = rawList.filter(t => t.status === 'DRAFT' || t.status === 'draft');
   //     setDrafts(list);
- 
+
   //   } catch (e) {
   //     setError('Failed to load drafts: ' + e.message);
   //   } finally {
@@ -83,44 +83,44 @@ export default function DraftsPage() {
   //   }
   // }, [user?.userId]);
   const load = useCallback(async () => {
- 
+
     if (!user?.userId) return;
- 
+
     setLoading(true);
- 
+
     setError('');
- 
+
     try {
- 
+
       const data = await fetchJson(
- 
+
         `${GATEWAY}/api/tickets/my-drafts?userId=${user.userId}`
- 
+
       );
- 
+
       // Backend returns List<Ticket> directly — no wrapper
- 
+
       const list = Array.isArray(data) ? data
- 
+
         : Array.isArray(data?.data) ? data.data
- 
+
           : [];
- 
+
       setDrafts(list);
- 
+
     } catch (e) {
- 
+
       setError('Failed to load drafts: ' + e.message);
- 
+
     } finally {
- 
+
       setLoading(false);
- 
+
     }
- 
+
   }, [user?.userId]);
   useEffect(() => { load(); }, [load]);
- 
+
   const handleSubmit = async (ticketId) => {
     setSubmitting(ticketId);
     setError(''); setSuccess('');
@@ -134,7 +134,7 @@ export default function DraftsPage() {
       setSubmitting(null);
     }
   };
-  
+
   const handleDeleteConfirm = async () => {
     const ticketId = confirmDeleteId;
     setConfirmDeleteId(null);
@@ -149,16 +149,16 @@ export default function DraftsPage() {
       setDeleting(null);
     }
   };
- 
+
 
   const filtered = drafts.filter(d =>
     `${d.ticketNumber ?? ''} ${d.subject ?? ''} ${d.category ?? ''}`
       .toLowerCase().includes(search.toLowerCase())
   );
- 
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, backgroundColor: '#F4F5F9', minHeight: '100vh' }}>
- 
+
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
         <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#27235C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <DraftsIcon sx={{ color: '#fff', fontSize: 20 }} />
@@ -176,16 +176,16 @@ export default function DraftsPage() {
           </Button>
         </Box>
       </Stack>
- 
+
       {success && <Alert severity="success" sx={{ mb: 2, borderRadius: '10px' }} onClose={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '10px' }} onClose={() => setError('')}>{error}</Alert>}
- 
+
       <TextField size="small" placeholder="Search drafts by ticket #, subject, category..."
         value={search} onChange={e => setSearch(e.target.value)}
         InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: '#9CA3AF' }} /></InputAdornment> }}
         sx={{ mb: 2.5, width: { xs: '100%', sm: 340 }, '& .MuiOutlinedInput-root': { borderRadius: '10px', backgroundColor: '#fff' } }}
       />
- 
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress sx={{ color: '#27235C' }} />
@@ -230,7 +230,7 @@ export default function DraftsPage() {
                       {d.subCategory && <Typography sx={{ fontSize: '0.75rem', color: '#9CA3AF' }}>· {d.subCategory}</Typography>} */}
                       {(d.category || d.categoryName) && <Typography sx={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{d.category || d.categoryName}</Typography>}
                       {(d.subCategory || d.subCategoryName) && <Typography sx={{ fontSize: '0.75rem', color: '#9CA3AF' }}>· {d.subCategory || d.subCategoryName}</Typography>}
- 
+
                       <Typography sx={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
                         Saved {fmtDate(d.updatedAt || d.createdAt)}
                       </Typography>
@@ -240,15 +240,27 @@ export default function DraftsPage() {
                     <Tooltip title="Edit draft">
                       <IconButton size="small"
                         // onClick={() => navigate(`/user/service-catalog?draftId=${tid}`)}
-                        onClick={() => navigate('/user/service-catalog', {
+                        // onClick={() => navigate('/user/service-catalog', {
+                        //   state: {
+                        //     draftTicket: d,
+                        //     category: { id: d.categoryId, name: d.category },
+                        //     subcategory: { id: d.subCategoryId, name: d.subCategory },
+                        //   }
+                        // })}
+                        onClick={() => navigate('/user/edit-draft', {
                           state: {
                             draftTicket: d,
-                            category: { id: d.categoryId, name: d.category },
-                            subcategory: { id: d.subCategoryId, name: d.subCategory },
+                            category: {
+                              id: d.categoryId,
+                              name: d.categoryName || d.category || '',
+                            },
+                            subcategory: {
+                              id: d.subCategoryId,
+                              name: d.subCategoryName || d.subCategory || '',
+                            },
                           }
                         })}
- 
- 
+
                         onClick={() => navigate('/user/edit-draft', {
                           state: {
                             draftTicket: d,
@@ -275,7 +287,7 @@ export default function DraftsPage() {
                         <DeleteIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Tooltip>
- 
+
                   </Stack>
                 </Stack>
               </Paper>
@@ -283,7 +295,7 @@ export default function DraftsPage() {
           })}
         </Stack>
       )}
-    <Dialog open={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)}>
+      <Dialog open={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)}>
         <DialogTitle>Delete Draft</DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -303,4 +315,3 @@ export default function DraftsPage() {
     </Box>
   );
 }
- 
