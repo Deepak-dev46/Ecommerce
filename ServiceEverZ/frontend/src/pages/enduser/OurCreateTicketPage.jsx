@@ -1026,7 +1026,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
 // US-149
-import { useDraftGuard, persistDraftToStorage, clearDraftFromStorage } from '../../hooks/useDraftGuard';
+import { useDraftGuard, persistDraftToStorage, clearDraftFromStorage } from '../../components/hooks/useDraftGuard';
 import DraftNavigationModal from '../../components/itsm/DraftNavigationModal';
 
 /* ── Inline styles ─────────────────────────────────────────────── */
