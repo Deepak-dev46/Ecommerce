@@ -14,7 +14,7 @@ import { Snackbar, Alert, Box, Button as MuiButton, Typography } from '@mui/mate
 import { useAuth } from '../../context/AuthContext';
 import OurServiceCatalogPage from './OurServiceCatalogPage';
 import OurCreateTicketPage from './OurCreateTicketPage';
-import { readDraftFromStorage, clearDraftFromStorage } from '../../hooks/useDraftGuard';
+import { readDraftFromStorage, clearDraftFromStorage } from '../../components/hooks/useDraftGuard';
 import RestoreIcon from '@mui/icons-material/Restore';
  
 export default function CreateTicketWrapper({ redirectTo = '/user/tickets', isDraftEdit = false }) {
