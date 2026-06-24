@@ -1842,7 +1842,7 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--gray-1)' }}>
                   {/* Search */}
                   <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 160, maxWidth: 260 }}>
-                    <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--gray-4)', pointerEvents: 'none' }}>🔍</span>
+                    <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--gray-4)', pointerEvents: 'none' }}></span>
                     <input
                       type="text" value={pendingSearch}
                       onChange={e => { setPendingSearch(e.target.value); setPP(1); }}
@@ -1864,7 +1864,7 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                     <option value="L2">L2 Only</option>
                   </FilterSelect>
  
-                  <FilterSelect value={filterDays} onChange={v => { setFilterDays(v); setPP(1); }} placeholder="All Ages" minWidth={130}>
+                  <FilterSelect value={filterDays} onChange={v => { setFilterDays(v); setPP(1); }} placeholder="All Days" minWidth={130}>
                     <option value="1">Today (≤ 1 day)</option>
                     <option value="3">≤ 3 days</option>
                     <option value="7">≤ 7 days</option>
@@ -1900,7 +1900,7 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                     {/* Table */}
                     <div style={{ background: 'var(--surface)', border: '1px solid var(--gray-1)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr 130px 110px 90px 70px 60px', padding: '10px 16px', background: 'var(--primary-50)', borderBottom: '2px solid var(--primary-100)', gap: 4 }}>
-                        {['Ticket No.', 'Subject', 'Requester', 'Category', 'Priority', 'Age', 'Role'].map(h => (
+                        {['Ticket No.', 'Subject', 'Requester', 'Category', 'Priority', 'Days', 'Role'].map(h => (
                           <div key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</div>
                         ))}
                       </div>
@@ -1981,7 +1981,7 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
           {modalLoading ? <Spinner /> : (
             <>
               {/* Approval status banner */}
-              {modal.mode === 'pending' && (
+              {/* {modal.mode === 'pending' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '10px 14px', background: '#FFFBEB', borderRadius: 8, border: '1px solid #FDE68A' }}>
                   <RoleBadge approval={modal.approval} approverId={approverId} />
                   <span style={{ fontSize: 12, color: '#78350F' }}>
@@ -1990,9 +1990,9 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                       : 'Awaiting your L1 approval decision.'}
                   </span>
                 </div>
-              )}
+              )} */}
  
-              {modal.mode === 'history' && (
+              {/* {modal.mode === 'history' && (
                 <div style={{ display: 'flex', gap: 16, marginBottom: 16, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--gray-1)' }}>
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gray-5)', textTransform: 'uppercase', marginBottom: 4 }}>L1 Decision</div>
@@ -2016,7 +2016,7 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                   )}
                 </div>
               )}
- 
+  */}
               {/* Ticket Info */}
               <SectionLabel>Ticket Details</SectionLabel>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
@@ -2037,11 +2037,11 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                 </>}
               </div>
  
-              <SectionLabel>Approval Chain</SectionLabel>
+              {/* <SectionLabel>Approval Chain</SectionLabel>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                 <InfoField label="L1 Approver" value={modal.approval.l1ApproverName || '—'} />
                 <InfoField label="L2 Approver" value={modal.approval.l2ApproverName || '—'} />
-              </div>
+              </div> */}
  
               {modal.ticket?.description && (
                 <>
@@ -2055,7 +2055,7 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
               {/* Action buttons */}
               {modal.mode === 'pending' && (
                 <div style={{ borderTop: '1px solid var(--gray-1)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                  <Button variant="ghost" onClick={closeModal}>Cancel</Button>
+                  {/* <Button variant="ghost" onClick={closeModal}>Cancel</Button> */}
                   <button className="btn btn--sm btn--ghost" onClick={() => { setNeedInfoText(''); setOverlay('needinfo'); }}>Need Info</button>
                   <button className="btn btn--sm btn--danger" onClick={() => { setRejectReason(''); setOverlay('reject'); }}>Reject</button>
                   <button className="btn btn--sm btn--success" onClick={() => setOverlay('approve')}>Approve</button>

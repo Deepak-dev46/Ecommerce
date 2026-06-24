@@ -41,6 +41,7 @@
 // }
 package com.rvz.approvalservice.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -126,4 +127,17 @@ public interface TicketApprovalRepository extends JpaRepository<TicketApproval, 
             AND t.resourceOwnerStatus = 'PENDING'
         """)
     List<TicketApproval> findAllPendingResourceOwner();
+    
+    @Query("""
+    	    SELECT t FROM TicketApproval t WHERE
+    	        t.updatedAt < :threshold
+    	        AND (
+    	            t.l1Status = 'PENDING'
+    	            OR (t.l1Status = 'APPROVED' AND t.l2Status = 'PENDING')
+    	            OR (t.l1Status = 'APPROVED' AND t.l2Status = 'APPROVED'
+    	                AND t.requiresResourceApproval = true
+    	                AND t.resourceOwnerStatus = 'PENDING')
+    	        )
+    	    """)
+    	List<TicketApproval> findStillPendingBefore(@Param("threshold") LocalDateTime threshold);
 }
