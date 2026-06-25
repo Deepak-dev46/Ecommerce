@@ -105,7 +105,23 @@ services:
       - eureka-service
     networks:
       - serviceeverz-network
- 
+  
+  email-ticket-service:
+    build:
+      context: ./services/email-ticket-service
+    container_name: email-ticket-service
+    environment:
+      DB_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+      ticket-service:
+        condition: service_started
+    networks:
+      - serviceeverz-network
+
   action-service:
     build:
       context: ./services/action-service

@@ -31,14 +31,20 @@ public class ParsedEmail {
     public static class Attachment {
         private String filename;
         private long   sizeBytes;
-        public Attachment(String filename, long sizeBytes) {
-            this.filename  = filename;
-            this.sizeBytes = sizeBytes;
+        private byte[] content;
+        private String contentType;
+     
+        public Attachment(String filename, long sizeBytes, byte[] content, String contentType) {
+            this.filename    = filename;
+            this.sizeBytes   = sizeBytes;
+            this.content     = content;
+            this.contentType = contentType;
         }
-        public String getFilename()  { return filename; }
-        public long   getSizeBytes() { return sizeBytes; }
+        public String getFilename()    { return filename; }
+        public long   getSizeBytes()   { return sizeBytes; }
+        public byte[] getContent()     { return content; }
+        public String getContentType() { return contentType; }
     }
-
     public String    getMessageId()                      { return messageId; }
     public void      setMessageId(String v)              { this.messageId = v; }
     public String    getFromAddress()                    { return fromAddress; }
