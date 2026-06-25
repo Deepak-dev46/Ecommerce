@@ -74,9 +74,19 @@ public class EmailParser {
     }
 
     // ── Subject: Category|SubCategory|FullName ────────────────────────────────
+//    private void parseSubject(String subject, ParsedEmail result) {
+//        if (subject == null || subject.isBlank()) return;
+//        String[] parts = subject.split("\\|", 3);
+//        if (parts.length >= 1) result.setCategory(parts[0].trim());
+//        if (parts.length >= 2) result.setSubCategory(parts[1].trim());
+//        if (parts.length >= 3) result.setRequesterName(parts[2].trim());
+//    }
     private void parseSubject(String subject, ParsedEmail result) {
         if (subject == null || subject.isBlank()) return;
-        String[] parts = subject.split("\\|", 3);
+        // Normalize: collapse extra spaces around pipe separators
+        String normalized = subject.trim().replaceAll("\\s*\\|\\s*", "|");
+        String[] parts = normalized.split("\\|", 3);
+        // Category and SubCategory stored as-is (trimmed); matching in service is equalsIgnoreCase
         if (parts.length >= 1) result.setCategory(parts[0].trim());
         if (parts.length >= 2) result.setSubCategory(parts[1].trim());
         if (parts.length >= 3) result.setRequesterName(parts[2].trim());
@@ -101,11 +111,25 @@ public class EmailParser {
                     continue;
                 }
 
+//                if (inDescription) {
+//                    descBuf.append(line).append("\n");
+//                    continue;
+//                }
                 if (inDescription) {
+                    // Stop at email signature markers and quoted reply headers
+                    if (trimmed.equals("--")
+                            || trimmed.startsWith("On ")   && trimmed.endsWith("wrote:")
+                            || trimmed.startsWith("From:") && trimmed.contains("Sent:")
+                            || trimmed.startsWith(">")
+                            || trimmed.equalsIgnoreCase("regards,")
+                            || trimmed.equalsIgnoreCase("thanks,")
+                            || trimmed.equalsIgnoreCase("thank you,")) {
+                        break; // stop collecting description
+                    }
                     descBuf.append(line).append("\n");
                     continue;
                 }
-
+                 
                 if (trimmed.isEmpty()) continue;
 
                 String key   = key(trimmed).toLowerCase().replace(" ", "").replace("_", "");
@@ -160,15 +184,34 @@ public class EmailParser {
                        .replaceAll("&nbsp;", " ")
                        .replaceAll("&amp;",  "&");
         }
+//        if (part.isMimeType("multipart/*")) {
+//            Multipart mp = (Multipart) part.getContent();
+//            StringBuilder sb = new StringBuilder();
+//            for (int i = 0; i < mp.getCount(); i++) {
+//                String t = extractText(mp.getBodyPart(i));
+//                if (t != null) sb.append(t).append("\n");
+//            }
+//            return sb.toString();
+//        }
         if (part.isMimeType("multipart/*")) {
             Multipart mp = (Multipart) part.getContent();
-            StringBuilder sb = new StringBuilder();
+            // Prefer plain text part; only fall back to HTML if no plain text found
+            String plainText = null;
+            String htmlText  = null;
             for (int i = 0; i < mp.getCount(); i++) {
-                String t = extractText(mp.getBodyPart(i));
-                if (t != null) sb.append(t).append("\n");
+                jakarta.mail.BodyPart bp = mp.getBodyPart(i);
+                if (bp.isMimeType("text/plain") && plainText == null) {
+                    plainText = extractText(bp);
+                } else if (bp.isMimeType("text/html") && htmlText == null) {
+                    htmlText = extractText(bp);
+                } else if (bp.isMimeType("multipart/*")) {
+                    String nested = extractText(bp);
+                    if (nested != null && plainText == null) plainText = nested;
+                }
             }
-            return sb.toString();
+            return plainText != null ? plainText : htmlText;
         }
+         
         return null;
     }
 
@@ -187,10 +230,13 @@ public class EmailParser {
                 String lower = filename.toLowerCase();
                 boolean valid = ALLOWED_EXTENSIONS.stream().anyMatch(lower::endsWith);
                 if (valid) {
-                    long size = part.getSize();
-                    if (size < 0) size = 0;
-                    result.getAttachments().add(new ParsedEmail.Attachment(filename, size));
-                } else {
+                    byte[] bytes = part.getInputStream().readAllBytes();
+                    long size = bytes.length;
+                    String contentType = part.getContentType() != null
+                            ? part.getContentType().split(";")[0].trim()
+                            : "application/octet-stream";
+                    result.getAttachments().add(new ParsedEmail.Attachment(filename, size, bytes, contentType));    
+            } else {
                     log.debug("Skipping unsupported attachment: {}", filename);
                 }
             }

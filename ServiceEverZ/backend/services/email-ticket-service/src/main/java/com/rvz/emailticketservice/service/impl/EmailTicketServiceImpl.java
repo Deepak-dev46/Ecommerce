@@ -492,13 +492,19 @@ public class EmailTicketServiceImpl {
 			p.put("assetId", assetId);
 		if (assetName != null)
 			p.put("asset", assetName); // display label
+//		if (e.getAccessRequiredTill() != null)
+//			p.put("accessRequiredTill", e.getAccessRequiredTill().toString());
 		if (e.getAccessRequiredTill() != null)
-			p.put("accessRequiredTill", e.getAccessRequiredTill().toString());
-
+		    // ticket-service CreateTicketRequest.accessRequiredTill is LocalDateTime
+		    p.put("accessRequiredTill", e.getAccessRequiredTill().atStartOfDay().toString());
+		 
 		// Attachment (first valid one)
 		if (!e.getAttachments().isEmpty()) {
-			p.put("attachmentName", e.getAttachments().get(0).getFilename());
-			p.put("attachmentSizeBytes", e.getAttachments().get(0).getSizeBytes());
+		    ParsedEmail.Attachment att = e.getAttachments().get(0);
+		    p.put("attachmentName", att.getFilename());
+		    p.put("attachmentSizeBytes", att.getSizeBytes());
+		    p.put("attachmentBase64", java.util.Base64.getEncoder().encodeToString(att.getContent()));
+		    p.put("attachmentMimeType", att.getContentType());
 		}
 		// Mode — always Email for this service
 		p.put("mode", "EMAIL");
