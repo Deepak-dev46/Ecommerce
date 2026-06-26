@@ -61,7 +61,9 @@ public class AcknowledgementTimeoutScheduler {
     public void checkAcknowledgementTimeouts() {
         log.info("[Scheduler] Running acknowledgement timeout check at {}", LocalDateTime.now());
 
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(30);
+        // LocalDateTime cutoff = LocalDateTime.now().minusMinutes(30);
+
+        LocalDateTime cutoff = LocalDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(30);
 
         List<TicketAssignment> timedOut = assignmentRepository.findAll()
                 .stream()

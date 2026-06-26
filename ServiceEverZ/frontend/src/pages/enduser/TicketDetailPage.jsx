@@ -106,9 +106,17 @@ const TABS = [
 ];
 
 /* ─── Helper Functions ──────────────────────────────────────────────────────── */
+
+// Backend returns LocalDateTime with no timezone suffix — append Z so browser parses as UTC
+const toUTC = (d) => {
+  if (!d) return new Date(NaN);
+  const s = typeof d === 'string';
+  return new Date(s && !d.endsWith('Z') && !d.includes('+') ? d + 'Z' : d);
+};
+
 const fmtDate = (d) =>
   d
-    ? new Date(d).toLocaleString('en-US', {
+    ? toUTC(d).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -119,7 +127,7 @@ const fmtDate = (d) =>
 
 const fmtShortDate = (d) =>
   d
-    ? new Date(d).toLocaleDateString('en-US', {
+    ? toUTC(d).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -127,21 +135,21 @@ const fmtShortDate = (d) =>
     : '—';
 
 const formatTimeWorklog = (dateStr) =>
-  new Date(dateStr).toLocaleTimeString('en-US', {
+  toUTC(dateStr).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
   });
 
 const formatDayHeader = (dateStr) =>
-  new Date(dateStr).toLocaleDateString('en-US', {
+  toUTC(dateStr).toLocaleDateString('en-US', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
 
-const toDateKey = (dateStr) => new Date(dateStr).toLocaleDateString('en-CA');
+const toDateKey = (dateStr) => toUTC(dateStr).toLocaleDateString('en-CA');
 
 /* ─── Shared UI Sub-components ─────────────────────────────────────────── */
 function PriorityBadge({ priority }) {
@@ -602,7 +610,7 @@ function HistoryRow({ event, isLast }) {
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
             <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827' }}>{agentName}</Typography>
             <Typography sx={{ fontSize: '0.75rem', color: '#6B7280' }}>
-              {new Date(event.createdAt).toLocaleString()}
+              {toUTC(event.createdAt).toLocaleString()}
             </Typography>
           </Stack>
 
@@ -687,7 +695,7 @@ function WorklogTab({ history }) {
   }
 
   // Order chronologically to construct lifecycle progression paths correctly
-  const ascendingHistory = [...history].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const ascendingHistory = [...history].sort((a, b) => toUTC(a.createdAt) - toUTC(b.createdAt));
 
   return (
     <Box sx={{ p: { xs: 2.5, md: 4 }, backgroundColor: '#F8FAFC' }}>
@@ -730,7 +738,7 @@ function WorklogTab({ history }) {
 
 /* ─── Modern Connected History Row Component ───────────────────── */
 function InteractiveHistoryRow({ event, isLast, index, prevStatus }) {
-  const createdAt = new Date(event.createdAt);
+  const createdAt = toUTC(event.createdAt);
   const date = createdAt.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
   const time = createdAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 

@@ -4,6 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { ticketApi, approvalApi } from '../../api/ourApi';
 import { incidentApi } from '../../api/index';           // ← incident API
 import { formatDate } from '../../utils/helpers';
+
+// Backend returns LocalDateTime with no timezone suffix — append Z so browser parses as UTC
+const toUTC = (dt) => {
+  if (!dt) return new Date(NaN);
+  const s = typeof dt === 'string';
+  return new Date(s && !dt.endsWith('Z') && !dt.includes('+') ? dt + 'Z' : dt);
+};
 import toast from 'react-hot-toast';
 import {
   Box, Typography, Stack, TextField, InputAdornment,
@@ -94,7 +101,7 @@ function exportToCSV(tickets, filename = 'my-tickets.csv') {
       t.item || '',
       t.status || '',
       priority,
-      t.createdAt ? new Date(t.createdAt).toLocaleString() : '',
+      t.createdAt ? toUTC(t.createdAt).toLocaleString() : '',
     ];
   });
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -148,7 +155,7 @@ export default function MyTicketsPage() {
 }));
  
       const all = [...normalised, ...incidents]
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        .sort((a, b) => toUTC(b.createdAt) - toUTC(a.createdAt));
  
       setTickets(all);
  

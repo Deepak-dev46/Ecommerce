@@ -8,10 +8,17 @@ export const PAGE_SIZE          = 10;
 export const requiresAccessTill = (itemName = '') =>
   ACCESS_TILL_ITEMS.some(k => itemName.toLowerCase().includes(k));
 
+// Backend returns LocalDateTime with no timezone suffix — append Z so browser parses as UTC
+const toUTC = (dt) => {
+  if (!dt) return new Date(NaN);
+  const s = typeof dt === 'string';
+  return new Date(s && !dt.endsWith('Z') && !dt.includes('+') ? dt + 'Z' : dt);
+};
+
 // Date: MM/DD/YYYY, time: 4:35 PM (Relevantz design system spec)
 export const formatDate = (dt) => {
   if (!dt) return '—';
-  const d    = new Date(dt);
+  const d    = toUTC(dt);
   const mm   = String(d.getMonth() + 1).padStart(2, '0');
   const dd   = String(d.getDate()).padStart(2, '0');
   const yyyy = d.getFullYear();
@@ -24,7 +31,7 @@ export const formatDate = (dt) => {
 
 export const formatDateOnly = (dt) => {
   if (!dt) return '—';
-  const d  = new Date(dt);
+  const d  = toUTC(dt);
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${mm}/${dd}/${d.getFullYear()}`;
@@ -50,7 +57,7 @@ export const validateMobile = (v) => {
 
 export const getAckTimeLeft = (assignedAt) => {
   if (!assignedAt) return null;
-  const diff = new Date(assignedAt).getTime() + 30 * 60 * 1000 - Date.now();
+  const diff = toUTC(assignedAt).getTime() + 30 * 60 * 1000 - Date.now();
   if (diff <= 0) return { label: 'TIMED OUT', timed: true };
   const m = Math.floor(diff / 60000);
   const s = Math.floor((diff % 60000) / 1000);
