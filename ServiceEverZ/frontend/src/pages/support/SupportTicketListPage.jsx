@@ -10,13 +10,13 @@ import TimerIcon from '@mui/icons-material/Timer';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DownloadIcon from '@mui/icons-material/Download';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getAssignedTickets } from '../../api/ticketApi';
 import TicketStatusChip from '../../components/common/TicketStatusChip';
 import { useAuth } from '../../context/AuthContext';
 import { triggerDuplicate } from '../../api/ticketRelationshipApi'
-
+ 
 /* ─── CSV Export ─────────────────────────────────────────────── */
 function exportToCSV(tickets, filename = 'assigned-tickets.csv') {
   const headers = ['Ticket #', 'Subject', 'Requester', 'Category', 'Priority', 'Status', 'SLA Breached', 'Updated At'];
@@ -28,7 +28,7 @@ function exportToCSV(tickets, filename = 'assigned-tickets.csv') {
     t.priority || '',
     t.status || '',
     t.slaBreached ? 'Yes' : 'No',
-    t.updatedAt ? new Date(t.updatedAt).toLocaleString() : '',
+    t.updatedAt ? new Date(t.updatedAt.endsWith('Z') ? t.updatedAt : t.updatedAt + 'Z').toLocaleString() : '',
   ]);
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -36,14 +36,14 @@ function exportToCSV(tickets, filename = 'assigned-tickets.csv') {
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
-
+ 
 const PRIORITY_COLOR = {
   LOW: { color: '#24A148', bg: '#EDFAF2' },
   MEDIUM: { color: '#E2B93B', bg: '#FDF8EC' },
   HIGH: { color: '#E01950', bg: '#FDEDF2' },
   CRITICAL: { color: '#97247E', bg: '#F8EDFB' },
 };
-
+ 
 function SlaIndicator({ slaBreached, slaRemainingMinutes }) {
   if (slaBreached) return (
     <Tooltip title="SLA Breached">
@@ -66,7 +66,7 @@ function SlaIndicator({ slaBreached, slaRemainingMinutes }) {
     </Stack>
   );
 }
-
+ 
 export default function SupportTicketListPage() {
   const [tickets, setTickets] = useState([]);
   const [search, setSearch] = useState('');
@@ -75,26 +75,24 @@ export default function SupportTicketListPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const {user} = useAuth();
   const navigate = useNavigate();
-
+  const location = useLocation(); // re-fetch whenever we navigate to this page
+ 
   const INCIDENT_URL = 'http://localhost:8088'; // direct to incident-service
-
-
+ 
+ 
   useEffect(() => {
     const load = async () => {
-      // console.log(user);
-
       try {
         const { data } = await getAssignedTickets(user.userId);
         setTickets(data);
-        // console.log(data)
       } catch { toast.error('Failed to load assigned tickets'); }
       finally { setLoading(false); }
     };
-    load();
-  }, []);
-
+    if (user?.userId) load();
+  }, [user?.userId, location.key]); // location.key changes on every navigation → always fresh
+ 
   const [ticketIds, setTicketIds] = useState([]);
-
+ 
   useEffect(() => {
     try {
       let trigger = async (id) => {
@@ -115,13 +113,13 @@ export default function SupportTicketListPage() {
       console.log(error);
     }
   }, [tickets])
-
+ 
   const filtered = tickets.filter(t =>
     `${t.ticketNumber} ${t.subject} ${t.requesterName} ${t.category}`
       .toLowerCase().includes(search.toLowerCase())
   );
   const paginatedTickets = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-
+ 
   const statusCards = [
     // { label: 'Total',       count: tickets.length,                                    color: '#27235C', bg: '#EEF0FF', border: '#C7C9E8' },
     // { label: 'Open',        count: tickets.filter(t => t.status === 'OPEN').length,   color: '#524F7D', bg: '#F0EFF8', border: '#C7C9E8' },
@@ -130,10 +128,10 @@ export default function SupportTicketListPage() {
     // { label: 'Closed',      count: tickets.filter(t => t.status === 'CLOSED').length, color: '#24A148', bg: '#EDFAF2', border: '#B7EAC9' },
     // { label: 'On Hold',     count: tickets.filter(t => t.status === 'ON_HOLD').length,color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
   ];
-
+ 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, backgroundColor: '#F4F5F9', minHeight: '100vh' }}>
-
+ 
       {/* ── Header ── */}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -167,7 +165,7 @@ export default function SupportTicketListPage() {
           Export CSV
         </Button>
       </Stack>
-
+ 
       {/* ── Status Cards ── */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {statusCards.map(({ label, count, color, bg, border }) => (
@@ -184,7 +182,7 @@ export default function SupportTicketListPage() {
           </Grid>
         ))}
       </Grid>
-
+ 
       {/* ── Search ── */}
       <TextField
         placeholder="Search by ticket number, subject, requester, or category..."
@@ -197,7 +195,7 @@ export default function SupportTicketListPage() {
           sx: { borderRadius: '10px' },
         }}
       />
-
+ 
       {/* ── Table ── */}
       <Paper elevation={0} sx={{ borderRadius: '14px', border: '1px solid #E5E7EB', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <TableContainer>

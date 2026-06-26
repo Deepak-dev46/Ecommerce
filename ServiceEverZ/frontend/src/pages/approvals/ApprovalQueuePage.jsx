@@ -2037,11 +2037,11 @@ export default function ApprovalQueuePage({ showSnack, defaultTab = 'PENDING' })
                 </>}
               </div>
  
-              <SectionLabel>Approval Chain</SectionLabel>
+              {/* <SectionLabel>Approval Chain</SectionLabel>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                 <InfoField label="L1 Approver" value={modal.approval.l1ApproverName || '—'} />
                 <InfoField label="L2 Approver" value={modal.approval.l2ApproverName || '—'} />
-              </div>
+              </div> */}
  
               {modal.ticket?.description && (
                 <>

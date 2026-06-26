@@ -1,5 +1,18 @@
-
+ 
 package com.rvz.assignmentservice.service.impl;
+ 
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.rvz.assignmentservice.client.MailClient;
 import com.rvz.assignmentservice.client.MasterDataClient;
@@ -17,32 +30,23 @@ import com.rvz.assignmentservice.exception.ResourceNotFoundException;
 import com.rvz.assignmentservice.repository.SupportPersonnelCapacityRepository;
 import com.rvz.assignmentservice.repository.TicketAssignmentRepository;
 import com.rvz.assignmentservice.service.AssignmentService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
-
+ 
 @Service
 @Transactional
 public class AssignmentServiceImpl implements AssignmentService {
-
+ 
     private static final Logger log = LoggerFactory.getLogger(AssignmentServiceImpl.class);
-
+ 
     private final TicketAssignmentRepository          ticketRepo;
     private final SupportPersonnelCapacityRepository  capacityRepo;
     private final AssignmentMapper                    mapper;
     private final MailClient                          mailClient;
     private final MasterDataClient                    masterDataClient;
     private final TicketClient                        ticketClient;
-
+ 
     @Value("${itsm.manager.user.id:0}")
     private Long itsmManagerUserId;
-
+ 
     public AssignmentServiceImpl(TicketAssignmentRepository ticketRepo,
                                   SupportPersonnelCapacityRepository capacityRepo,
                                   AssignmentMapper mapper,
@@ -56,20 +60,20 @@ public class AssignmentServiceImpl implements AssignmentService {
         this.masterDataClient = masterDataClient;
         this.ticketClient     = ticketClient;
     }
-
+ 
     // ── Round-Robin selection ────────────────────────────────────────────────
     private SupportPersonnelCapacity selectNextPerson(
             List<SupportPersonnelCapacity> activePersonnel,
             Long excludePersonId) {
-
+ 
         List<TicketAssignment> allActive = ticketRepo.findAll().stream()
                 .filter(a -> AssignmentConstants.STATUS_ASSIGNED.equals(a.getStatus())
                           || AssignmentConstants.STATUS_OPEN.equals(a.getStatus()))
                 .collect(Collectors.toList());
-
+ 
         Map<Long, Long> countMap = allActive.stream()
                 .collect(Collectors.groupingBy(TicketAssignment::getSupportPersonId, Collectors.counting()));
-
+ 
         Map<Long, LocalDateTime> lastAssigned = ticketRepo.findAll().stream()
                 .filter(a -> a.getAssignedAt() != null)
                 .collect(Collectors.toMap(
@@ -77,7 +81,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                         TicketAssignment::getAssignedAt,
                         (existing, replacement) -> replacement.isAfter(existing) ? replacement : existing
                 ));
-
+ 
         return activePersonnel.stream()
                 .filter(p -> excludePersonId == null || !p.getSupportPersonId().equals(excludePersonId))
                 .min(Comparator
@@ -89,20 +93,20 @@ public class AssignmentServiceImpl implements AssignmentService {
                 )
                 .orElseThrow(() -> new AssignmentException("No eligible support personnel found"));
     }
-
+ 
     // ── triggerAssignment ────────────────────────────────────────────────────
     @Override
     public AssignmentResponse triggerAssignment(TriggerAssignmentRequest request) {
         log.info("Triggering assignment for ticketId={}", request.getTicketId());
-
+ 
         List<SupportPersonnelCapacity> active = capacityRepo.findByActiveTrue();
         if (active.isEmpty()) {
             throw new AssignmentException("No active support personnel available");
         }
-
+ 
         SupportPersonnelCapacity selected;
         boolean isManual = request.getSupportPersonId() != null;
-
+ 
         if (isManual) {
             selected = active.stream()
                     .filter(p -> p.getSupportPersonId().equals(request.getSupportPersonId()))
@@ -116,10 +120,10 @@ public class AssignmentServiceImpl implements AssignmentService {
             log.info("Auto round-robin: ticketId={} → personId={} ({})",
                     request.getTicketId(), selected.getSupportPersonId(), selected.getSupportPersonName());
         }
-
+ 
         TicketAssignment assignment = ticketRepo.findByTicketId(request.getTicketId())
                 .orElse(new TicketAssignment());
-
+ 
         assignment.setTicketId(request.getTicketId());
         assignment.setSupportPersonId(selected.getSupportPersonId());
         assignment.setSupportPersonName(selected.getSupportPersonName());
@@ -130,22 +134,26 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setStatus(AssignmentConstants.STATUS_ASSIGNED);
         assignment.setAssignedAt(LocalDateTime.now());
         assignment.setReassigned(false);
-
+ 
         TicketAssignment saved = ticketRepo.save(assignment);
-
-        // ✅ Step 1 — Update ticket-service: writes ASSIGNED + IN_PROGRESS history rows
-        // (both rows written inside TicketService.assignTicket based on isManual flag)
-        try {
-            updateTicketAssignee(request.getTicketId(),
-                    selected.getSupportPersonId(), selected.getSupportPersonName(),
-                    isManual ? request.getAssignedByName() : null,   // ITSM manager name for manual
-                    isManual);
-        } catch (Exception e) {
-            log.warn("Could not update assignee in ticket-service for ticketId={}: {}",
-                    request.getTicketId(), e.getMessage());
+ 
+        // For MANUAL assignment: write assigneeId + IN_PROGRESS to ticket table immediately
+        // (ITSM manager directly confirmed — no acknowledge step required)
+        // For AUTO assignment: do NOT write to ticket table yet.
+        // assigneeId/assigneeName will only be saved when the support person acknowledges.
+        if (isManual) {
+            try {
+                updateTicketAssignee(request.getTicketId(),
+                        selected.getSupportPersonId(), selected.getSupportPersonName(),
+                        request.getAssignedByName(),
+                        true);
+            } catch (Exception e) {
+                log.warn("Could not update assignee in ticket-service for ticketId={}: {}",
+                        request.getTicketId(), e.getMessage());
+            }
         }
-
-        // ✅ Step 3 — Email notification to assigned agent
+ 
+        //  Step 3 — Email notification to assigned agent
         String email = resolveUserEmail(selected.getSupportPersonId());
         if (email != null) {
             sendEmail(email,
@@ -154,10 +162,10 @@ public class AssignmentServiceImpl implements AssignmentService {
                 + selected.getSupportPersonName() + ").\n"
                 + "Please acknowledge within 30 minutes via the Support Dashboard.");
         }
-
+ 
         return mapper.toResponse(saved);
     }
-
+ 
     // ── acknowledgeTicket ────────────────────────────────────────────────────
     @Override
     @Transactional
@@ -174,7 +182,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setAcknowledgedAt(LocalDateTime.now());
         TicketAssignment saved = ticketRepo.save(assignment);
  
-        // ✅ updateTicketAssignee writes IN_PROGRESS history inside ticket-service.
+        // updateTicketAssignee writes IN_PROGRESS history inside ticket-service.
         // We do NOT write another ASSIGNED row here — that was already written
         // in triggerAssignment(). This call only ensures the ticket record has
         // the correct assigneeId/assigneeName if it was missed earlier.
@@ -203,28 +211,28 @@ public class AssignmentServiceImpl implements AssignmentService {
  
         return mapper.toResponse(saved);
     }
-
+ 
     // ── checkAndReassignIfTimeout ────────────────────────────────────────────
     @Override
     public AssignmentResponse checkAndReassignIfTimeout(Long ticketId) {
         TicketAssignment assignment = ticketRepo.findByTicketId(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException(AssignmentConstants.TICKET_NOT_FOUND + ticketId));
-
+ 
         if (assignment.getAcknowledgedAt() != null ||
             !AssignmentConstants.STATUS_ASSIGNED.equals(assignment.getStatus())) {
             return mapper.toResponse(assignment);
         }
-
+ 
         if (!LocalDateTime.now().isAfter(assignment.getAssignedAt().plusMinutes(30))) {
             return mapper.toResponse(assignment);
         }
-
+ 
         List<SupportPersonnelCapacity> active = capacityRepo.findByActiveTrue();
         Long currentPersonId = assignment.getSupportPersonId();
         String previousName  = assignment.getSupportPersonName();
-
+ 
         SupportPersonnelCapacity next = selectNextPerson(active, currentPersonId);
-
+ 
         assignment.setSupportPersonId(next.getSupportPersonId());
         assignment.setSupportPersonName(next.getSupportPersonName());
         assignment.setRemainingHours(null);
@@ -232,7 +240,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setAssignedAt(LocalDateTime.now());
         assignment.setReassigned(true);
         ticketRepo.save(assignment);
-
+ 
         // Write ASSIGNED history for the reassignment
         writeHistory(
             ticketId,
@@ -242,11 +250,11 @@ public class AssignmentServiceImpl implements AssignmentService {
             0L,
             "System"
         );
-
+ 
         // Update ticket-service with new assignee (auto reassign = not manual)
         updateTicketAssignee(ticketId, next.getSupportPersonId(), next.getSupportPersonName(),
                 null, false);
-
+ 
         String managerEmail = resolveUserEmail(itsmManagerUserId);
         if (managerEmail != null) {
             sendEmail(managerEmail,
@@ -255,7 +263,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                 + " within 30 minutes. The ticket has been reassigned to "
                 + next.getSupportPersonName() + ".");
         }
-
+ 
         String newEmail = resolveUserEmail(next.getSupportPersonId());
         if (newEmail != null) {
             sendEmail(newEmail,
@@ -264,35 +272,35 @@ public class AssignmentServiceImpl implements AssignmentService {
                 + next.getSupportPersonName() + "). "
                 + "Please acknowledge within 30 minutes via the Support Dashboard.");
         }
-
+ 
         return mapper.toResponse(assignment);
     }
-
+ 
     @Override
     @Transactional(readOnly = true)
     public AssignmentResponse getAssignment(Long ticketId) {
         return mapper.toResponse(ticketRepo.findByTicketId(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException(AssignmentConstants.TICKET_NOT_FOUND + ticketId)));
     }
-
+ 
     @Override
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getAssignmentsBySupportPerson(Long supportPersonId) {
         return ticketRepo.findBySupportPersonId(supportPersonId)
                 .stream().map(mapper::toResponse).collect(Collectors.toList());
     }
-
+ 
     @Override
     public void addSupportPersonnelCapacity(Long userId, String fullName) {
         boolean exists = capacityRepo.findByActiveTrue()
                 .stream()
                 .anyMatch(c -> c.getSupportPersonId().equals(userId));
-
+ 
         if (exists) {
             log.info("Capacity entry already exists for userId={}, skipping", userId);
             return;
         }
-
+ 
         SupportPersonnelCapacity cap = new SupportPersonnelCapacity();
         cap.setSupportPersonId(userId);
         cap.setSupportPersonName(fullName != null && !fullName.isBlank() ? fullName : "Support Personnel");
@@ -301,10 +309,10 @@ public class AssignmentServiceImpl implements AssignmentService {
         cap.setTotalResponseTimeHours(0.0);
         cap.setTotalEstimatedHours(0.0);
         capacityRepo.save(cap);
-
+ 
         log.info("Added support personnel capacity for userId={}, name={}", userId, fullName);
     }
-
+ 
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAllAssignments() {
@@ -322,7 +330,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             return m;
         }).toList();
     }
-
+ 
     @Override
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getAssignmentsByStatus(String status) {
@@ -331,9 +339,9 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .map(mapper::toResponse)
                 .toList();
     }
-
+ 
     // ── Private helpers ──────────────────────────────────────────────────────
-
+ 
     /**
      * Calls PUT /api/tickets/{ticketId}/assign on ticket-service.
      * Passes assignedByName and isManual so ticket-service can write:
@@ -351,9 +359,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         log.info("Ticket #{} assignee updated in ticket-service: {} (id={}) isManual={}",
                 ticketId, assigneeName, assigneeId, isManual);
     }
-
+ 
     /**
-     * ✅ Writes a history row to ticket-service via POST /api/tickets/{ticketId}/history.
+     * Writes a history row to ticket-service via POST /api/tickets/{ticketId}/history.
      * Non-fatal — logs a warning on failure so the main assignment flow is never blocked.
      *
      * @param ticketId      the ticket to write history for
@@ -376,7 +384,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             log.warn("Could not write history for ticketId={}: {}", ticketId, e.getMessage());
         }
     }
-
+ 
     private void sendEmail(String to, String subject, String body) {
         try {
             mailClient.sendEmail(new EmailRequest(to, subject, body, false));
@@ -385,7 +393,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             log.warn("Email send failed to {}: {}", to, ex.getMessage());
         }
     }
-
+ 
     @SuppressWarnings("unchecked")
     private String resolveUserEmail(Long userId) {
         if (userId == null || userId <= 0) return null;
@@ -403,7 +411,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
         return null;
     }
-
+ 
     @SuppressWarnings("unchecked")
     private String resolveRequesterEmail(Long ticketId) {
         if (ticketId == null) return null;
