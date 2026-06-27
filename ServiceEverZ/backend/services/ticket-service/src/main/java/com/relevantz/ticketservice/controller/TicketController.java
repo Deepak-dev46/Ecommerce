@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,7 @@ import com.relevantz.ticketservice.dto.CommentResponse;
 import com.relevantz.ticketservice.dto.CreateTicketRequest;
 import com.relevantz.ticketservice.dto.HistoryResponse;
 import com.relevantz.ticketservice.dto.ReopenTicketRequest;
+import com.relevantz.ticketservice.dto.SimilarTicketResponse;
 import com.relevantz.ticketservice.dto.SlaResponse;
 import com.relevantz.ticketservice.dto.SubmitTicketRequest;
 import com.relevantz.ticketservice.dto.TicketResponse;
@@ -32,6 +35,8 @@ import com.relevantz.ticketservice.model.Ticket;
 import com.relevantz.ticketservice.model.TicketStatus;
 import com.relevantz.ticketservice.repository.TicketRepository;
 import com.relevantz.ticketservice.service.OurTicketService;
+import com.relevantz.ticketservice.service.SimilarTicketService;
+import com.relevantz.ticketservice.service.TicketPdfService;
 import com.relevantz.ticketservice.service.TicketService;
 
 import jakarta.validation.Valid;
@@ -43,11 +48,18 @@ public class TicketController {
     private final TicketService service;
     private final OurTicketService ourService;
     private final TicketRepository ticketRepository;
+    private final SimilarTicketService similarTicketService;
+    private final TicketPdfService ticketPdfService;
 
-    public TicketController(TicketService service, OurTicketService ourService, TicketRepository ticketRepository) {
+    public TicketController(TicketService service, OurTicketService ourService,
+                            TicketRepository ticketRepository,
+                            SimilarTicketService similarTicketService,
+                            TicketPdfService ticketPdfService) {
         this.service = service;
         this.ourService = ourService;
         this.ticketRepository = ticketRepository;
+        this.similarTicketService = similarTicketService;
+        this.ticketPdfService = ticketPdfService;
     }
  
     // =========================================================
@@ -278,7 +290,42 @@ public class TicketController {
         return ResponseEntity.ok(service.resumeTicket(id, req));
     }
  
-   
+    // =========================================================
+    // DUPLICATE WARNING — GET /api/tickets/similar
+    // Called while the user types the ticket title.
+    // Returns a list of similar OPEN tickets (no DB writes).
+    // =========================================================
+
+    @GetMapping("/similar")
+    public ResponseEntity<ApiResponse<List<SimilarTicketResponse>>> getSimilarTickets(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long subCategoryId,
+            @RequestParam(required = false) Long typeId,
+            @RequestParam(required = false) Long itemId) {
+
+        List<SimilarTicketResponse> matches =
+                similarTicketService.findSimilar(title, categoryId, subCategoryId, typeId, itemId);
+        return ResponseEntity.ok(ok("Similar tickets fetched", matches));
+    }
+
+    // =========================================================
+    // TICKET PDF DOWNLOAD — GET /api/tickets/{id}/pdf
+    // Generates and streams a structured PDF for the given ticket.
+    // =========================================================
+
+    @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> downloadTicketPdf(@PathVariable Long id) {
+        byte[] pdfBytes = ticketPdfService.generate(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "ticket-" + id + ".pdf");
+        headers.setContentLength(pdfBytes.length);
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
     private <T> ApiResponse<T> ok(String message, T data) {
         ApiResponse<T> r = new ApiResponse<>();
         r.setSuccess(true);

@@ -25,8 +25,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     // ✅ Count by status (CORRECT ✅)
     @Query("SELECT COUNT(t) FROM Ticket t WHERE t.status = :status")
     long countByStatus(@Param("status") TicketStatus status);
-   
+
+    // ✅ Used by SimilarTicketService — find all non-closed/cancelled tickets
+    List<Ticket> findByStatusIn(List<TicketStatus> statuses);
     @Query("SELECT t.assigneeName FROM Ticket t WHERE t.ticketId = ?1")
     String getAssigneeName(long id);
 }
- 

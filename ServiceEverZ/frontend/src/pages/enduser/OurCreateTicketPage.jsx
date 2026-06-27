@@ -1,10 +1,10 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { masterApi, ticketApi } from '../../api/ourApi';
+import { getSimilarTickets } from '../../api/ticketApi';
 import { rmoApi } from '../../api/rmoApi';
 import { buildSubject, validateMobile } from '../../utils/helpers';
 import { userApi } from '../../api/userApi';
-import { Button, Spinner } from '../../components/itsm/UI';
+import { Button, Spinner } from '../../components/itsm/UI'
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getItemsBySubcategory } from '../../api/serviceCatalogApi';
@@ -18,10 +18,7 @@ import {
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
-// US-149
-import { useDraftGuard, persistDraftToStorage, clearDraftFromStorage } from '../../components/hooks/useDraftGuard';
-import DraftNavigationModal from '../../components/itsm/DraftNavigationModal';
-
+ 
 /* ── Inline styles ─────────────────────────────────────────────── */
 const styles = `
   .ct-form-grid {
@@ -119,7 +116,7 @@ const styles = `
   .ct-required { color: #dc2626; margin-left: 2px; }
   .ct-card-compact { padding: 12px 16px !important; }
 `;
-
+ 
 function StyleInjector() {
     useEffect(() => {
         const el = document.createElement('style');
@@ -130,7 +127,8 @@ function StyleInjector() {
     }, []);
     return null;
 }
-
+ 
+/* ── Field wrapper ──────────────────────────────────────────────── */
 function Field({ label, required, error, children, className = '' }) {
     return (
         <div className={`ct-form-group ${className}`}>
@@ -144,11 +142,12 @@ function Field({ label, required, error, children, className = '' }) {
         </div>
     );
 }
-
+ 
+/* ── Rich Text Editor ─────────────────────────────────────────── */
 function RTE({ value, onChange, error, placeholder }) {
     const ref = useRef(null);
     const initialized = useRef(false);
-
+ 
     useEffect(() => {
         if (ref.current && !initialized.current) {
             ref.current.innerHTML = value || '';
@@ -156,13 +155,13 @@ function RTE({ value, onChange, error, placeholder }) {
         }
         // eslint-disable-next-line
     }, []);
-
+ 
     const exec = (cmd, val) => {
         ref.current?.focus();
         document.execCommand(cmd, false, val ?? null);
         onChange(ref.current?.innerHTML || '');
     };
-
+ 
     return (
         <div style={{ overflow: 'auto', width: '100%', height: '110px' }}>
             <div className={`rte-wrapper${error ? ' error' : ''}`}>
@@ -185,11 +184,11 @@ function RTE({ value, onChange, error, placeholder }) {
         </div>
     );
 }
-
+ 
 function Uploader({ value, onChange }) {
     const [err, setErr] = useState(''); const [drag, setDrag] = useState(false); const ref = useRef(null);
     const EXTS = ['.jpg', '.jpeg', '.png', '.pdf', '.docx']; const MAX = 30 * 1024 * 1024;
-
+ 
     const handle = (file) => {
         if (!file) return;
         const ext = '.' + file.name.split('.').pop().toLowerCase();
@@ -203,7 +202,7 @@ function Uploader({ value, onChange }) {
         };
         reader.readAsDataURL(file);
     };
-
+ 
     return (
         <div className="ct-form-group span-full"><label className="ct-form-label">Attachments</label>
             <div className={`file-uploader${drag ? ' dragging' : ''}`} onClick={() => ref.current?.click()}
@@ -219,10 +218,11 @@ function Uploader({ value, onChange }) {
         </div>
     );
 }
-
+ 
+/* ── Attachment Viewer Modal (same as TicketDetailPage) ─────────── */
 function AttachmentViewerModal({ attachment, onClose }) {
     const [objectUrl, setObjectUrl] = useState(null);
-
+ 
     useEffect(() => {
         if (!attachment?.base64) { setObjectUrl(null); return; }
         const byteChars = atob(attachment.base64);
@@ -233,7 +233,7 @@ function AttachmentViewerModal({ attachment, onClose }) {
         setObjectUrl(url);
         return () => URL.revokeObjectURL(url);
     }, [attachment]);
-
+ 
     const handleDownload = () => {
         if (!objectUrl) return;
         const link = document.createElement('a');
@@ -243,10 +243,10 @@ function AttachmentViewerModal({ attachment, onClose }) {
         link.click();
         document.body.removeChild(link);
     };
-
+ 
     const isImage = attachment?.type?.startsWith('image/');
     const isPdf = attachment?.type === 'application/pdf';
-
+ 
     return (
         <Dialog
             open={!!attachment}
@@ -295,7 +295,7 @@ function AttachmentViewerModal({ attachment, onClose }) {
                     </Stack>
                 </Stack>
             </DialogTitle>
-
+ 
             <DialogContent sx={{ flex: 1, p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', overflow: 'hidden' }}>
                 {!objectUrl ? (
                     <CircularProgress size={36} sx={{ color: '#27235C' }} />
@@ -334,22 +334,145 @@ function AttachmentViewerModal({ attachment, onClose }) {
         </Dialog>
     );
 }
+ 
+/* ── Similar Tickets Warning Panel ──────────────────────────────── */
+function SimilarTicketsPanel({ matches, onViewTicket, onDismiss }) {
+    if (!matches || matches.length === 0) return null;
 
-// US-149: restoredForm prop added
-export default function CreateTicketPage({ preSelected, onSuccess, showSnack, onBack, draftTicket, overrideUser, restoredForm }) {
+    const statusColor = (s) => {
+        if (!s) return '#6b7280';
+        switch (s.toUpperCase()) {
+            case 'OPEN':        return '#059669';
+            case 'IN_PROGRESS': return '#2563eb';
+            case 'REOPENED':    return '#d97706';
+            default:            return '#6b7280';
+        }
+    };
 
+    return (
+        <div style={{
+            margin: '10px 0',
+            border: '1.5px solid #fbbf24',
+            borderRadius: 8,
+            background: '#fffbeb',
+            overflow: 'hidden',
+        }}>
+            {/* Panel header */}
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 14px',
+                background: '#fef3c7',
+                borderBottom: '1px solid #fde68a',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>⚠️</span>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: '#92400e' }}>
+                        Similar Tickets Found ({matches.length})
+                    </span>
+                    <span style={{ fontSize: 11, color: '#b45309', fontWeight: 400 }}>
+                        — You may already have an open request for this
+                    </span>
+                </div>
+                <button
+                    onClick={onDismiss}
+                    style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#b45309', fontSize: 14, lineHeight: 1, padding: '2px 4px',
+                    }}
+                    title="Dismiss"
+                >✕</button>
+            </div>
+
+            {/* Ticket rows */}
+            <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {matches.map(t => (
+                    <div key={t.ticketId} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '7px 10px',
+                        background: '#fff',
+                        border: '1px solid #fde68a',
+                        borderRadius: 6,
+                        gap: 10,
+                    }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span style={{
+                                    fontSize: 11, fontWeight: 700, color: '#27235C',
+                                    background: '#ede9fe', borderRadius: 4, padding: '1px 6px',
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    {t.ticketNumber}
+                                </span>
+                                <span style={{
+                                    fontSize: 10, fontWeight: 600,
+                                    color: statusColor(t.status),
+                                    border: `1px solid ${statusColor(t.status)}`,
+                                    borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap',
+                                }}>
+                                    {t.status}
+                                </span>
+                                {t.matchScore >= 60 && (
+                                    <span style={{
+                                        fontSize: 10, color: '#dc2626', fontWeight: 700,
+                                        background: '#fef2f2', border: '1px solid #fca5a5',
+                                        borderRadius: 4, padding: '1px 5px',
+                                    }}>
+                                        High Match
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{
+                                fontSize: 12, color: '#374151', marginTop: 3,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                                {t.subject}
+                            </div>
+                            {(t.categoryName || t.subCategoryName) && (
+                                <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                                    {[t.categoryName, t.subCategoryName, t.itemName].filter(Boolean).join(' › ')}
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => onViewTicket(t.ticketId)}
+                            style={{
+                                flexShrink: 0,
+                                fontSize: 11, fontWeight: 600,
+                                color: '#27235C', background: '#ede9fe',
+                                border: '1px solid #c4b5fd',
+                                borderRadius: 5, padding: '4px 10px',
+                                cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}
+                        >
+                            View Ticket
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            {/* Footer — user can still continue */}
+            <div style={{
+                padding: '6px 14px 8px',
+                fontSize: 11, color: '#78716c',
+                borderTop: '1px solid #fde68a',
+                background: '#fffbeb',
+            }}>
+                These are existing open tickets that may match your request. You can still continue creating a new ticket.
+            </div>
+        </div>
+    );
+}
+
+export default function CreateTicketPage({ preSelected, onSuccess, showSnack, onBack, draftTicket, overrideUser }) {
+ 
     const isDraft = !!draftTicket;
     const navigate = useNavigate();
     let { user } = useAuth();
     const { state } = useLocation();
     const { serviceType, category, subcategory } = state || {};
-
-    // US-149: draft guard hook
-    const { markDirty, markClean, showModal, confirmNavigation, cancelNavigation } = useDraftGuard();
-    const [draftModalSaving, setDraftModalSaving] = useState(false);
-
+ 
     const [currentUser, setCurrentUser] = useState();
-
+ 
     useEffect(() => {
         if (overrideUser) {
             setCurrentUser(overrideUser);
@@ -359,15 +482,15 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             .then(res => setCurrentUser(res.data))
             .catch(() => { });
     }, [overrideUser]);
-
+ 
     const [items, setItems] = useState([]);
     const [selectedItemObj, setSelectedItemObj] = useState(null);
     const [selectedItem, setSelectedItem] = useState('');
-
+ 
     useEffect(() => {
         if (!subcategory) navigate('/catalog');
     }, [subcategory, navigate]);
-
+ 
     useEffect(() => {
         if (!subcategory) return;
         getItemsBySubcategory(subcategory.id)
@@ -384,7 +507,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             })
             .catch(() => toast.error('Failed to load items'));
     }, [subcategory]);
-
+ 
     const safeSnack = (msg, type) => {
         if (typeof showSnack === 'function') {
             showSnack(msg, type);
@@ -392,7 +515,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             type === 'error' ? toast.error(msg) : toast.success(msg);
         }
     };
-
+ 
     const safeSuccess = (data) => {
         if (typeof onSuccess === 'function') {
             onSuccess(data);
@@ -401,27 +524,27 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             navigate('/user/tickets');
         }
     };
-
+ 
     const draftSubcatId =
         draftTicket?.subCategoryId ||
         draftTicket?.subcategoryId ||
         draftTicket?.id ||
         draftTicket?.sub_category_id ||
         null;
-
+ 
     const userName = currentUser?.fullName || [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || '';
     const subject = buildSubject(category?.name, subcategory?.name, userName);
-
+ 
     const [disable, setDisable] = useState(false);
-
+ 
     const mode = [
         { name: "Web Form", id: 1, value: 'WEB_FORM' },
         { name: "Call", id: 2, value: 'CALL' },
         { name: "Chat", id: 3, value: 'CHAT' }
     ];
-
+ 
     const [users, setUsers] = useState([]);
-
+ 
     useEffect(() => {
         if (user.roles[0] == 'SUPPORT_PERSONNEL') {
             setDisable(true);
@@ -438,36 +561,14 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             console.log(error);
         }
     }, []);
-
-    // const [form, setForm] = useState({
-    //     item: null, location: null, asset: null, priority: null, mode: null,
-    //     mobile: '', description: isDraft ? (draftTicket.description || '') : '',
-    //     attachment: null, accessTill: '',
-    //     projectId: isDraft && draftTicket.projectId ? String(draftTicket.projectId) : '',
-    // });
-    const [form, setForm] = useState(() => {
-        if (isDraft && draftTicket) {
-            return {
-                item: draftTicket.itemId ? String(draftTicket.itemId) : null,
-                location: draftTicket.location
-                    ? { value: draftTicket.location, label: draftTicket.location }
-                    : null,
-                asset: null,
-                priority: null,   // resolved after priorities load
-                mode: null,
-                mobile: draftTicket.mobileNumber || '',
-                description: draftTicket.description || '',
-                attachment: null,
-                accessTill: '',
-                projectId: draftTicket.projectId ? String(draftTicket.projectId) : '',
-            };
-        }
-        return {
-            item: null, location: null, asset: null, priority: null, mode: null,
-            mobile: '', description: '', attachment: null, accessTill: '', projectId: '',
-        };
+ 
+    const [form, setForm] = useState({
+        item: null, location: null, asset: null, priority: null, mode: null,
+        mobile: '', description: isDraft ? (draftTicket.description || '') : '',
+        attachment: null, accessTill: '',
+        projectId: isDraft && draftTicket.projectId ? String(draftTicket.projectId) : '',
     });
-
+ 
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [priorities, setPriorities] = useState([]);
@@ -477,20 +578,46 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
     const [showPreview, setShowPreview] = useState(false);
     const [previewAttachment, setPreviewAttachment] = useState(null);
 
-    // US-149: set() marks form as dirty and persists to localStorage on every change
+    // ── Duplicate warning state ──────────────────────────────────────────────
+    const [similarTickets, setSimilarTickets] = useState([]);
+    const [similarDismissed, setSimilarDismissed] = useState(false);
+    const similarDebounceRef = useRef(null);
+
+    // Fire duplicate check whenever subject changes (debounced 800ms)
+    useEffect(() => {
+        if (similarDismissed) return;
+        if (!subject || subject.trim().length < 10) {
+            setSimilarTickets([]);
+            return;
+        }
+        clearTimeout(similarDebounceRef.current);
+        similarDebounceRef.current = setTimeout(async () => {
+            try {
+                const res = await getSimilarTickets({
+                    title: subject,
+                    categoryId: category?.id ? Number(category.id) : undefined,
+                    subCategoryId: subcategory?.id ? Number(subcategory.id) : undefined,
+                    typeId: undefined,
+                    itemId: form.item ? Number(form.item) : undefined,
+                });
+                const list = res?.data?.data || res?.data || [];
+                setSimilarTickets(Array.isArray(list) ? list : []);
+            } catch {
+                // Silently ignore — duplicate warning is non-blocking
+            }
+        }, 800);
+        return () => clearTimeout(similarDebounceRef.current);
+    }, [subject, form.item, similarDismissed]);
+    // ── End duplicate warning ────────────────────────────────────────────────
+ 
     const set = (k, v) => {
-        setForm(f => {
-            const next = { ...f, [k.trim()]: v };
-            persistDraftToStorage({ form: next, category, subcategory, serviceType, customItemDesc });
-            return next;
-        });
-        markDirty();
+        setForm(f => ({ ...f, [k.trim()]: v })); console.log(k, v);
         setErrors(e => { const n = { ...e }; delete n[k.trim()]; return n; });
     };
-
+ 
     const showAccess = selectedItemObj?.accessDateRequired === true;
     const isOthersItem = form.item?.label?.toLowerCase() === 'others';
-
+ 
     useEffect(() => {
         try {
             let loadProjects = async () => {
@@ -502,7 +629,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             console.log(error);
         }
     }, [currentUser]);
-
+ 
     useEffect(() => {
         masterApi.getPriorities()
             .then(data => {
@@ -532,7 +659,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                 }
             });
     }, []);
-
+ 
     useEffect(() => {
         if (!currentUser?.id) return;
         if (currentUser?.preloadedAsset) {
@@ -564,7 +691,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                 .catch(() => { set('asset', null); });
         });
     }, [currentUser?.id]);
-
+ 
     useEffect(() => {
         if (!isDraft || !draftTicket?.ticketId) return;
         ticketApi.getAttachments(draftTicket.ticketId)
@@ -583,28 +710,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             .catch(err => console.warn('Could not load draft attachment:', err));
         // eslint-disable-next-line
     }, [isDraft, draftTicket?.ticketId]);
-
-    // US-149: restore form from localStorage (browser crash / refresh scenario)
-    useEffect(() => {
-        if (!restoredForm || isDraft) return;
-        if (restoredForm.projectId) set('projectId', restoredForm.projectId);
-        if (restoredForm.mobile) set('mobile', restoredForm.mobile);
-        if (restoredForm.description) set('description', restoredForm.description);
-        if (restoredForm.accessTill) set('accessTill', restoredForm.accessTill);
-        if (restoredForm.location) set('location', restoredForm.location);
-        if (restoredForm.mode) set('mode', restoredForm.mode);
-        if (restoredForm.priority && priorities.length) {
-            const found = priorities.find(p => String(p.priorityId) === String(restoredForm.priority?.value));
-            if (found) set('priority', { value: found.priorityId, label: found.priorityName });
-        }
-        if (restoredForm.item && items.length) {
-            set('item', restoredForm.item);
-            const found = items.find(i => String(i.value) === String(restoredForm.item));
-            if (found) setSelectedItemObj(found);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [restoredForm, priorities.length, items.length]);
-
+ 
     const validateDraft = () => {
         if (!form.projectId) {
             setErrors({ projectId: 'Please select a project to save as draft' });
@@ -614,7 +720,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
         setErrors({});
         return true;
     };
-
+ 
     const validateSubmit = () => {
         const e = {};
         if (!form.projectId) e.projectId = 'Please select a project title';
@@ -629,7 +735,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
         setErrors(e);
         return Object.keys(e).length === 0;
     };
-
+ 
     const buildPayload = () => {
         const payload = {
             requestedById: currentUser?.id || user?.userId || null,
@@ -666,7 +772,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
         console.log('[buildPayload] item:', payload.item, 'itemId:', payload.itemId);
         return payload;
     };
-
+ 
     const handleDraft = async () => {
         if (!validateDraft()) return;
         setLoading('draft');
@@ -678,8 +784,6 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                 await ticketApi.saveDraft(buildPayload());
                 safeSnack('Draft saved', 'success');
             }
-            markClean();              // US-149
-            clearDraftFromStorage();  // US-149
             if (typeof onBack === 'function') onBack();
             else navigate('/user/drafts');
         } catch (e) {
@@ -687,7 +791,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             safeSnack(msg, 'error');
         } finally { setLoading(false); }
     };
-
+ 
     const handleSubmit = async () => {
         if (!validateSubmit()) {
             safeSnack('Please fill in all mandatory fields', 'error');
@@ -708,54 +812,15 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                 console.log(buildPayload());
             }
             safeSnack('Ticket submitted.', 'success');
-            markClean();              // US-149
-            clearDraftFromStorage();  // US-149
             safeSuccess(t);
         } catch (e) {
             const msg = e?.response?.data?.message || e.message || 'Submission failed';
             safeSnack(msg, 'error');
         } finally { setLoading(false); }
     };
-
-    // US-149: modal handlers (triggered by useBlocker when user tries to navigate away)
-    const handleModalSaveDraft = async () => {
-        if (!form.projectId) {
-            safeSnack('Please select a project before saving as draft', 'error');
-            cancelNavigation();
-            return;
-        }
-        setDraftModalSaving(true);
-        try {
-            if (isDraft && draftTicket?.ticketId) {
-                await ticketApi.updateDraft(draftTicket.ticketId, buildPayload());
-            } else {
-                await ticketApi.saveDraft(buildPayload());
-            }
-            safeSnack('Draft saved', 'success');
-            markClean();
-            clearDraftFromStorage();
-            confirmNavigation();
-        } catch (e) {
-            const msg = e?.response?.data?.message || e.message || 'Failed to save draft';
-            safeSnack(msg, 'error');
-            cancelNavigation();
-        } finally {
-            setDraftModalSaving(false);
-        }
-    };
-
-    const handleModalDiscard = () => {
-        markClean();
-        clearDraftFromStorage();
-        confirmNavigation();
-    };
-
-    const handleModalStay = () => {
-        cancelNavigation();
-    };
-
+ 
     const [locations, setLocations] = useState([]);
-
+ 
     useEffect(() => {
         try {
             getAllLocations()
@@ -781,7 +846,8 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             console.log(error);
         }
     }, []);
-
+ 
+    /* ── Preview Modal ──────────────────────────────────────────── */
     const PreviewModal = () => {
         const previewFields = [
             { label: 'Category', value: category?.name },
@@ -799,12 +865,12 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             { label: 'Asset', value: form.asset?.label },
             ...(showAccess ? [{ label: 'Access Required Till', value: form.accessTill }] : []),
         ];
-
+ 
         const requiredKeys = ['projectId', 'item', 'location', 'priority', 'description', 'mobile'];
         const hasErrors = requiredKeys.some(k =>
             !form[k] || (k === 'description' && form[k].replace(/<[^>]+>/g, '').trim() === '')
         );
-
+ 
         return (
             <div style={{
                 position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
@@ -814,17 +880,20 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                     background: '#fff', borderRadius: 10, width: '90%', maxWidth: 680,
                     maxHeight: '85vh', overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                 }}>
+                    {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1.5px solid #ede9fe' }}>
                         <span style={{ fontWeight: 700, fontSize: 14, color: '#27235C' }}>Ticket Preview</span>
                         <button onClick={() => setShowPreview(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#6b7280' }}>✕</button>
                     </div>
-
+ 
+                    {/* Warning */}
                     {hasErrors && (
                         <div style={{ margin: '12px 20px 0', padding: '8px 12px', background: '#fff8f8', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 12, color: '#dc2626' }}>
                             ⚠ Some mandatory fields are missing. Please fill them before submitting.
                         </div>
                     )}
-
+ 
+                    {/* Fields */}
                     <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px' }}>
                         {previewFields.map(({ label, value, isHtml }) => {
                             const isEmpty = !value || (typeof value === 'string' && value.replace(/<[^>]+>/g, '').trim() === '');
@@ -842,7 +911,8 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                             );
                         })}
                     </div>
-
+ 
+                    {/* Attachment row — clickable to open viewer */}
                     {form.attachment && (
                         <div style={{ padding: '0 20px 12px' }}>
                             <span style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attachment</span>
@@ -858,7 +928,8 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                             </div>
                         </div>
                     )}
-
+ 
+                    {/* Footer */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '12px 20px', borderTop: '1.5px solid #ede9fe' }}>
                         <Button variant="ghost" onClick={() => setShowPreview(false)}>Edit</Button>
                         <Button variant="primary" onClick={() => { setShowPreview(false); handleSubmit(); }} loading={loading === 'submit'}>
@@ -869,29 +940,22 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
             </div>
         );
     };
-
+ 
     return (
         <div>
             <StyleInjector />
-
+ 
+            {/* Preview modal */}
             {showPreview && <PreviewModal />}
-
+ 
+            {/* Attachment viewer — renders on top of preview modal when attachment is clicked */}
             {previewAttachment && (
                 <AttachmentViewerModal
                     attachment={previewAttachment}
                     onClose={() => setPreviewAttachment(null)}
                 />
             )}
-
-            {/* US-149: unsaved-changes modal — fires when user tries to navigate away */}
-            <DraftNavigationModal
-                open={showModal}
-                saving={draftModalSaving}
-                onSaveDraft={handleModalSaveDraft}
-                onDiscard={handleModalDiscard}
-                onStay={handleModalStay}
-            />
-
+ 
             <div className="page-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <div className="page-header__breadcrumb">
                     <span onClick={onBack} style={{ cursor: 'pointer' }}>{isDraft ? 'My Tickets' : 'Service Catalog'}</span>
@@ -902,11 +966,11 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                     {isDraft ? `Edit Draft — ${draftTicket.ticketNumber || ''}` : category?.name ? `${category.name} — ${subcategory?.name}` : 'New Ticket'}
                 </div>
             </div>
-
+ 
             <div className="card ct-card-compact">
-
+ 
                 <div className="ct-section-title" style={{ marginTop: 0 }}>Service Classification</div>
-
+ 
                 <div className="ct-form-grid">
                     <Field label="Project Title" required error={errors.projectId}>
                         <select
@@ -921,7 +985,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                     <Field label="Category" required>
                         <div className="ct-readonly-field">{category.name || '—'}</div>
                     </Field>
-
+                    
                     <Field label="Sub Category" required>
                         <div className="ct-readonly-field">{subcategory.name || '—'}</div>
                     </Field>
@@ -962,9 +1026,9 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                         </Field>
                     )}
                 </div>
-
+ 
                 <div className="ct-section-title">Requester Details</div>
-
+ 
                 <div className="ct-form-grid three-col">
                     <Field label="Requester Name" required>
                         {disable ? (
@@ -1003,13 +1067,27 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                         )}
                     </Field>
                 </div>
-
+ 
                 <div className="ct-section-title">Ticket Details</div>
-
+ 
                 <Field label="Subject" required>
                     <div className="ct-readonly-field" style={{ color: 'var(--gray-7)' }}>{subject || 'Auto-generated'}</div>
                 </Field>
 
+                {/* ── Duplicate Warning Panel ── */}
+                {!similarDismissed && similarTickets.length > 0 && (
+                    <SimilarTicketsPanel
+                        matches={similarTickets}
+                        onViewTicket={(id) => {
+                            window.open(`/user/tickets/${id}`, '_blank', 'noopener');
+                        }}
+                        onDismiss={() => {
+                            setSimilarDismissed(true);
+                            setSimilarTickets([]);
+                        }}
+                    />
+                )}
+ 
                 <Field label="Description" required error={errors.description}>
                     <RTE
                         value={form.description}
@@ -1018,9 +1096,9 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                         placeholder="Describe your request..."
                     />
                 </Field>
-
+ 
                 <div className="ct-section-title">Contact &amp; Asset</div>
-
+ 
                 <div className="ct-form-grid">
                     <Field label="Priority" required error={errors.priority}>
                         <select
@@ -1067,7 +1145,7 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                         <div className="ct-readonly-field">{form.asset?.label || 'No asset assigned'}</div>
                     </Field>
                 </div>
-
+ 
                 {showAccess && (
                     <>
                         <div className="alert alert--info">Access Required Till is mandatory for this item.</div>
@@ -1083,22 +1161,22 @@ export default function CreateTicketPage({ preSelected, onSuccess, showSnack, on
                         </Field>
                     </>
                 )}
-
+ 
                 <Uploader value={form.attachment} onChange={v => set('attachment', v)} />
-
+ 
                 <div className="divider" style={{ margin: '8px 0' }} />
-
+ 
                 <div className="flex-end flex-gap-3">
                     <Button variant="ghost" onClick={() => navigate('/user/dashboard')}>Cancel</Button>
                     <Button variant="secondary" onClick={handleDraft} loading={loading === 'draft'} disabled={!!loading && loading !== 'draft'}>
                         {isDraft ? 'Save Draft' : 'Save as Draft'}
                     </Button>
-                    {/* <Button variant="secondary" onClick={() => setShowPreview(true)}>Preview</Button> */}
-                    <Button variant="primary" onClick={() => setShowPreview(true)} loading={loading === 'submit'} disabled={!!loading && loading !== 'submit'}>Submit</Button>
+                    <Button variant="secondary" onClick={() => setShowPreview(true)}>Preview</Button>
+                    <Button variant="primary" onClick={handleSubmit} loading={loading === 'submit'} disabled={!!loading && loading !== 'submit'}>Submit</Button>
                 </div>
-
+ 
             </div>
-
+ 
         </div>
     );
 }
