@@ -127,3 +127,31 @@ export const updateAllowUserReply = (id, allowUserReply) =>
   ticketAxios.patch(`/api/tickets/${id}/allowUserReply`, {
     allowUserReply,
   });
+
+
+  //add new by team A
+
+export const getTicketCommentsForUser = (ticketId, requesterId) =>
+  ticketAxios.get(`/api/comments/ticket/${ticketId}`, {
+    params: requesterId ? { requesterId } : {},
+  });
+
+// PATCH /api/comments/:commentId  — edit within 15-min window (support only)
+export const editComment = (commentId, body) =>
+  ticketAxios.patch(`/api/comments/${commentId}`, body);
+
+// POST /api/comments/:commentId/reactions  — toggle an emoji reaction
+export const toggleCommentReaction = (commentId, body) =>
+  ticketAxios.post(`/api/comments/${commentId}/reactions`, body);
+
+// =====================
+// Duplicate Detection Warning
+// =====================
+export const getSimilarTickets = (params) =>
+  ticketAxios.get('/api/tickets/similar', { params });
+
+// =====================
+// Ticket PDF Download
+// =====================
+export const downloadTicketPdf = (ticketId) =>
+  ticketAxios.get(`/api/tickets/${ticketId}/pdf`, { responseType: 'blob' });

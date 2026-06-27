@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -62,6 +63,10 @@ import {
   getTicketHistory,
   reopenTicket,
   updateTicketStatus,
+  editComment,         
+  toggleCommentReaction,
+  getTicketCommentsForUser,
+  downloadTicketPdf,
 } from '../../api/ticketApi';
 import TicketStatusChip from '../../components/common/TicketStatusChip';
 import { useAuth } from '../../context/AuthContext';
@@ -285,7 +290,228 @@ function WorklogStatusBadge({ status }) {
 }
 
 /* ─── Conversations & Chat Elements ────────────────────────────────────── */
-function CommentBubble({ comment, isOwnMessage }) {
+// ── Context-aware quick reply suggestions (End User) ─────────────────────────
+// Returns 3-5 most relevant replies based on current ticket status and
+// the last message sender role.
+function getEndUserQuickReplies(ticketStatus, lastComment) {
+  const lastRole = lastComment?.authRole || null;
+  const lastText = (lastComment?.comment || '').toLowerCase();
+
+  // After a resolution or closure message from support → show user confirmation replies
+  const isAfterResolutionOrClose =
+    lastRole === 'SUPPORT_PERSONNEL' &&
+    (ticketStatus === 'RESOLVED' ||
+      ticketStatus === 'CLOSED' ||
+      lastText.includes('resolved') ||
+      lastText.includes('closed') ||
+      lastText.includes('please verify') ||
+      lastText.includes('please check') ||
+      lastText.includes('completed') ||
+      lastText.includes('access has been granted'));
+
+  if (isAfterResolutionOrClose) {
+    return [
+      { label: 'Issue resolved ✓',           text: 'The issue is resolved. Thank you!' },
+      { label: 'Everything is working',       text: 'Everything is working now. Thank you for the support.' },
+      { label: 'Thank you for the update',    text: 'Thank you for the update.' },
+      { label: 'Still facing the issue',      text: 'I am still facing the issue. Please look into it.' },
+      { label: 'Please reopen the ticket',    text: 'Please reopen the ticket. The issue has not been fixed.' },
+    ];
+  }
+
+  // After support asks for info / screenshots / confirmation
+  const isAfterInfoRequest =
+    lastRole === 'SUPPORT_PERSONNEL' &&
+    (lastText.includes('screenshot') ||
+      lastText.includes('error message') ||
+      lastText.includes('more details') ||
+      lastText.includes('confirm') ||
+      lastText.includes('share'));
+
+  if (isAfterInfoRequest) {
+    return [
+      { label: 'Will share screenshot',       text: 'I will share the screenshot shortly.' },
+      { label: 'Here is the error message',   text: 'Here is the error message I am seeing.' },
+      { label: 'Issue still persists',        text: 'The issue is still persisting.' },
+      { label: 'Need more time to test',      text: 'I need more time to test. Will update shortly.' },
+    ];
+  }
+
+  // Work in progress stage — support sent an update
+  if (
+    lastRole === 'SUPPORT_PERSONNEL' &&
+    (lastText.includes('working on') ||
+      lastText.includes('fix') ||
+      lastText.includes('in progress') ||
+      lastText.includes('investigating') ||
+      lastText.includes('update you'))
+  ) {
+    return [
+      { label: 'Thank you for the update',    text: 'Thank you for the update. Awaiting resolution.' },
+      { label: 'Issue still persists',        text: 'The issue is still persisting.' },
+      { label: 'Please prioritize',           text: 'This is urgent. Please prioritize.' },
+    ];
+  }
+
+  // Default / initial stage
+  return [
+    { label: 'Issue still persists',          text: 'The issue is still persisting.' },
+    { label: 'Need more time to test',        text: 'I need more time to test. Will update shortly.' },
+    { label: 'This resolved my issue',        text: 'This resolved my issue. Thank you!' },
+  ];
+}
+
+// ── Supported reactions ───────────────────────────────────────────────────────
+const REACTION_OPTIONS = [
+  { key: 'LIKE',         emoji: '👍', label: 'Like' },
+  { key: 'ACKNOWLEDGED', emoji: '✅', label: 'Acknowledged' },
+  { key: 'THANKS',       emoji: '🙏', label: 'Thanks' },
+];
+
+// ── EmojiPickerPortal ────────────────────────────────────────────────────────
+// Renders into document.body via React Portal — position:fixed so it is never
+// clipped by any ancestor overflow or stacking context.
+function EmojiPickerPortal({ anchorRef, commentId, myReactions = [], onToggle, isOwnMessage, visible, onPickerMouseEnter, onPickerMouseLeave }) {
+  const activeKey = myReactions?.[0] ?? null;
+  const [style, setStyle] = React.useState(null);
+
+  React.useLayoutEffect(() => {
+    if (!visible || !anchorRef.current) { setStyle(null); return; }
+    const rect    = anchorRef.current.getBoundingClientRect();
+    const PILL_H  = 44;
+    const GAP     = 6;
+    const placeAbove = rect.top >= PILL_H + GAP;
+    const top     = placeAbove ? rect.top - PILL_H - GAP : rect.bottom + GAP;
+    const posStyle = isOwnMessage
+      ? { right: window.innerWidth - rect.right }
+      : { left: rect.left };
+    setStyle({ top, ...posStyle, placeAbove });
+  }, [visible, anchorRef, isOwnMessage]);
+
+  if (!visible || !style) return null;
+  const slideDir = style.placeAbove ? '8px' : '-8px';
+
+  return createPortal(
+    <Box
+      onMouseEnter={onPickerMouseEnter}
+      onMouseLeave={onPickerMouseLeave}
+      sx={{
+        position: 'fixed',
+        top:   style.top,
+        left:  style.left  !== undefined ? style.left  : 'unset',
+        right: style.right !== undefined ? style.right : 'unset',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '2px',
+        px: '8px',
+        py: '4px',
+        borderRadius: '20px',
+        backgroundColor: '#FFFFFF',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        border: '1px solid #E5E7EB',
+        zIndex: 9999,
+        pointerEvents: 'auto',
+        animation: 'pickerFade 0.15s ease forwards',
+        '@keyframes pickerFade': {
+          from: { opacity: 0, transform: `translateY(${slideDir})` },
+          to:   { opacity: 1, transform: 'translateY(0)' },
+        },
+      }}
+    >
+      {REACTION_OPTIONS.map(({ key, emoji, label }) => {
+        const isActive = activeKey === key;
+        return (
+          <Box
+            key={key}
+            title={label}
+            onClick={(e) => { e.stopPropagation(); onToggle(commentId, key); onPickerMouseLeave?.(); }}
+            sx={{
+              fontSize: '1.4rem',
+              lineHeight: 1,
+              px: '5px',
+              py: '3px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              userSelect: 'none',
+              transition: 'transform 0.12s ease, background 0.12s ease',
+              backgroundColor: isActive ? '#EEF0FB' : 'transparent',
+              outline: isActive ? '2px solid #27235C' : 'none',
+              outlineOffset: '1px',
+              '&:hover': { transform: 'scale(1.4)', backgroundColor: '#F3F4F6' },
+            }}
+          >
+            {emoji}
+          </Box>
+        );
+      })}
+    </Box>,
+    document.body
+  );
+}
+
+// ── ReactionBadges ────────────────────────────────────────────────────────────
+// Always-visible badges in normal document flow below the bubble.
+function ReactionBadges({ commentId, reactionCounts = {}, myReactions = [], onToggle, isOwnMessage }) {
+  const activeKey    = myReactions?.[0] ?? null;
+  const hasReactions = REACTION_OPTIONS.some(({ key }) => (reactionCounts[key] ?? 0) > 0);
+  if (!hasReactions) return null;
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 0.5,
+        flexWrap: 'wrap',
+        mt: 0.75,
+        justifyContent: isOwnMessage ? 'flex-end' : 'flex-start',
+      }}
+    >
+      {REACTION_OPTIONS.map(({ key, emoji }) => {
+        const count    = reactionCounts[key] ?? 0;
+        if (count === 0) return null;
+        const isActive = activeKey === key;
+        return (
+          <Box
+            key={key}
+            onClick={() => onToggle(commentId, key)}
+            title={`${count} reaction${count !== 1 ? 's' : ''}`}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.4,
+              px: 0.8,
+              py: 0.2,
+              borderRadius: '10px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              userSelect: 'none',
+              border: `1.5px solid ${isActive ? '#27235C' : '#E5E7EB'}`,
+              backgroundColor: isActive ? '#EEF0FB' : '#F9FAFB',
+              transition: 'all 0.15s ease',
+              '&:hover': { borderColor: '#27235C', backgroundColor: '#EEF0FB' },
+            }}
+          >
+            <span>{emoji}</span>
+            <Typography component="span" sx={{ fontSize: '0.75rem', fontWeight: 600, color: isActive ? '#27235C' : '#6B7280', lineHeight: 1 }}>
+              {count}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+// ── CommentBubble ─────────────────────────────────────────────────────────────
+function CommentBubble({ comment, isOwnMessage, userId, onToggleReaction }) {
+  const [isHovered, setIsHovered]   = useState(false);
+  const bubbleRef                   = useRef(null);
+  const leaveTimerRef               = useRef(null);
+
+  const handleMouseEnter = () => { clearTimeout(leaveTimerRef.current); setIsHovered(true); };
+  const handleMouseLeave = () => { leaveTimerRef.current = setTimeout(() => setIsHovered(false), 200); };
+  React.useEffect(() => () => clearTimeout(leaveTimerRef.current), []);
+
   return (
     <Stack
       direction="row"
@@ -312,50 +538,64 @@ function CommentBubble({ comment, isOwnMessage }) {
         </Avatar>
       )}
 
-      <Box sx={{ maxWidth: '75%', minWidth: 120 }}>
+      {/* Entire message column is the hover zone */}
+      <Box
+        sx={{ maxWidth: '75%', minWidth: 120 }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <Box sx={{ mb: 0.8 }}>
-          <Typography
-            sx={{
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: '#1F2937',
-              textAlign: isOwnMessage ? 'right' : 'left',
-            }}
-          >
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F2937', textAlign: isOwnMessage ? 'right' : 'left' }}>
             {comment.authorName}
           </Typography>
-          <Typography
-            sx={{
-              fontSize: '0.72rem',
-              color: '#9CA3AF',
-              mt: 0.2,
-              textAlign: isOwnMessage ? 'right' : 'left',
-            }}
-          >
+          <Typography sx={{ fontSize: '0.72rem', color: '#9CA3AF', mt: 0.2, textAlign: isOwnMessage ? 'right' : 'left' }}>
             {fmtDate(comment.createdAt)}
+            {comment.edited && (
+              <Box component="span" sx={{ ml: 0.8, color: '#B0B7C3', fontStyle: 'italic' }}>
+                (edited {fmtDate(comment.editedAt)})
+              </Box>
+            )}
           </Typography>
         </Box>
 
-        <Box
-          sx={{
-            p: 1.8,
-            borderRadius: isOwnMessage ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
-            backgroundColor: isOwnMessage ? '#EEF0FB' : '#FFFFFF',
-            border: `1px solid ${isOwnMessage ? '#C7C9E8' : '#E5E7EB'}`,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-          }}
-        >
-          <Typography
+        {/* Bubble — ref used as portal anchor */}
+        <Box ref={bubbleRef} sx={{ position: 'relative' }}>
+          <Box
             sx={{
-              fontSize: '0.85rem',
-              whiteSpace: 'pre-wrap',
-              lineHeight: 1.6,
-              color: '#374151',
+              p: 1.8,
+              borderRadius: isOwnMessage ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+              backgroundColor: isOwnMessage ? '#EEF0FB' : '#FFFFFF',
+              border: `1px solid ${isOwnMessage ? '#C7C9E8' : '#E5E7EB'}`,
+              boxShadow: isHovered ? '0 2px 8px rgba(0,0,0,0.10)' : '0 1px 4px rgba(0,0,0,0.05)',
+              transition: 'box-shadow 0.15s ease',
             }}
           >
-            {comment.comment}
-          </Typography>
+            <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#374151' }}>
+              {comment.comment}
+            </Typography>
+          </Box>
+
+          {/* Portal picker — never overlaps the bubble text */}
+          <EmojiPickerPortal
+            anchorRef={bubbleRef}
+            commentId={comment.id}
+            myReactions={comment.myReactions}
+            onToggle={onToggleReaction}
+            isOwnMessage={isOwnMessage}
+            visible={isHovered}
+            onPickerMouseEnter={handleMouseEnter}
+            onPickerMouseLeave={handleMouseLeave}
+          />
         </Box>
+
+        {/* Reaction badges — always visible in normal flow below the bubble */}
+        <ReactionBadges
+          commentId={comment.id}
+          reactionCounts={comment.reactionCounts}
+          myReactions={comment.myReactions}
+          onToggle={onToggleReaction}
+          isOwnMessage={isOwnMessage}
+        />
       </Box>
 
       {isOwnMessage && (
@@ -379,8 +619,10 @@ function CommentBubble({ comment, isOwnMessage }) {
 
 const MAX_CHARS = 100;
 
+// ── ConversationsTab (REPLACEMENT — end user) ─────────────────────────────────
 function ConversationsTab({
   comments,
+  setComments,          // needed to update reactions in-place
   ticket,
   commentText,
   setCommentText,
@@ -391,8 +633,11 @@ function ConversationsTab({
   user,
 }) {
   const canComment = COMMENT_ALLOWED.includes(ticket?.status) && allowUserReply;
-  const charCount = commentText.length;
-  const isEmpty = commentText.trim().length === 0;
+  // Derive context-aware quick replies from last comment and ticket status
+  const lastComment = comments.length > 0 ? comments[comments.length - 1] : null;
+  const quickReplies = getEndUserQuickReplies(ticket?.status, lastComment);
+  const charCount  = commentText.length;
+  const isEmpty    = commentText.trim().length === 0;
 
   const getCounterColor = () => {
     if (charCount >= MAX_CHARS) return '#EF4444';
@@ -404,6 +649,78 @@ function ConversationsTab({
     if (charCount >= MAX_CHARS) return '#EF4444';
     if (charCount > 0) return isHover ? '#1A9A3C' : '#24A148';
     return isHover ? '#D1D5DB' : '#E5E7EB';
+  };
+
+  // Quick reply: insert template text into the text box
+  const handleQuickReply = (templateText) => {
+    if (commentText.length + templateText.length <= MAX_CHARS) {
+      setCommentText(templateText);
+    } else {
+      setCommentText(templateText.slice(0, MAX_CHARS));
+    }
+  };
+
+  // Toggle / replace reaction — one active reaction per user per message.
+  // If same emoji → remove it. If different emoji → remove old first, then add new.
+  const handleToggleReaction = async (commentId, emoji) => {
+    if (!user?.userId) return;
+
+    // Snapshot current state for rollback on error
+    const snapshot = comments.find((c) => c.id === commentId);
+    const currentActive = snapshot?.myReactions?.[0] ?? null;
+    const isSame = currentActive === emoji;
+
+    // Optimistic update
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id !== commentId) return c;
+        const newMyReactions = isSame ? [] : [emoji];
+        const updatedCounts  = { ...(c.reactionCounts ?? {}) };
+        if (currentActive && !isSame) {
+          updatedCounts[currentActive] = Math.max(0, (updatedCounts[currentActive] ?? 1) - 1);
+        }
+        if (!isSame) {
+          updatedCounts[emoji] = (updatedCounts[emoji] ?? 0) + 1;
+        } else {
+          updatedCounts[emoji] = Math.max(0, (updatedCounts[emoji] ?? 1) - 1);
+        }
+        return { ...c, myReactions: newMyReactions, reactionCounts: updatedCounts };
+      })
+    );
+
+    try {
+      let finalData;
+
+      if (!isSame && currentActive) {
+        // Remove the existing reaction first, then add the new one
+        await toggleCommentReaction(commentId, { userId: user.userId, emoji: currentActive });
+        const { data } = await toggleCommentReaction(commentId, { userId: user.userId, emoji });
+        finalData = data;
+      } else {
+        // Simple toggle (add if none, remove if same)
+        const { data } = await toggleCommentReaction(commentId, { userId: user.userId, emoji });
+        finalData = data;
+      }
+
+      // Reconcile with authoritative server response
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? { ...c, reactionCounts: finalData.reactionCounts, myReactions: finalData.myReactions }
+            : c
+        )
+      );
+    } catch {
+      // Roll back optimistic update
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? { ...c, reactionCounts: snapshot?.reactionCounts, myReactions: snapshot?.myReactions }
+            : c
+        )
+      );
+      toast.error('Failed to update reaction');
+    }
   };
 
   return (
@@ -433,6 +750,8 @@ function ConversationsTab({
               key={c.id || i}
               comment={c}
               isOwnMessage={c.userId === user?.userId}
+              userId={user?.userId}
+              onToggleReaction={handleToggleReaction}
             />
           ))}
           <div ref={commentsEndRef} />
@@ -446,11 +765,37 @@ function ConversationsTab({
             Add Reply
           </Typography>
 
+          {/* ── Quick Reply Suggestions (context-aware) ── */}
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography sx={{ fontSize: '0.75rem', color: '#6B7280' }}>Quick reply:</Typography>
+            {quickReplies.map((t) => (
+              <Box
+                key={t.label}
+                onClick={() => handleQuickReply(t.text)}
+                sx={{
+                  fontSize: '0.73rem',
+                  px: 1.2,
+                  py: 0.4,
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  backgroundColor: '#F9FAFB',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  '&:hover': { borderColor: '#27235C', color: '#27235C', backgroundColor: '#EEF0FB' },
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {t.label}
+              </Box>
+            ))}
+          </Stack>
+
           <TextField
             multiline
             minRows={3}
             maxRows={8}
-            placeholder="Type your reply here..."
+            placeholder="Type your reply here…"
             value={commentText}
             onChange={(e) => {
               if (e.target.value.length <= MAX_CHARS) {
@@ -461,10 +806,7 @@ function ConversationsTab({
             variant="outlined"
             InputProps={{
               endAdornment: (
-                <InputAdornment
-                  position="end"
-                  sx={{ alignSelf: 'flex-end', mb: 1.2, mr: 0.5 }}
-                >
+                <InputAdornment position="end" sx={{ alignSelf: 'flex-end', mb: 1.2, mr: 0.5 }}>
                   <Typography
                     sx={{
                       fontSize: '0.72rem',
@@ -479,28 +821,15 @@ function ConversationsTab({
               ),
             }}
             helperText={isEmpty ? 'Reply cannot be empty' : ''}
-            FormHelperTextProps={{
-              sx: {
-                fontSize: '0.74rem',
-                color: '#9CA3AF',
-                mt: 0.5,
-              },
-            }}
+            FormHelperTextProps={{ sx: { fontSize: '0.74rem', color: '#9CA3AF', mt: 0.5 } }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: '10px',
                 fontSize: '0.87rem',
                 alignItems: 'flex-start',
-                '& fieldset': {
-                  borderColor: getBorderColor(),
-                  transition: 'border-color 0.2s ease',
-                },
-                '&:hover fieldset': {
-                  borderColor: getBorderColor(true),
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: charCount >= MAX_CHARS ? '#EF4444' : '#24A148',
-                },
+                '& fieldset': { borderColor: getBorderColor(), transition: 'border-color 0.2s ease' },
+                '&:hover fieldset': { borderColor: getBorderColor(true) },
+                '&.Mui-focused fieldset': { borderColor: charCount >= MAX_CHARS ? '#EF4444' : '#24A148' },
               },
             }}
           />
@@ -508,11 +837,7 @@ function ConversationsTab({
           <Stack direction="row" justifyContent="flex-end" spacing={1}>
             <Button
               variant="contained"
-              endIcon={
-                submitting
-                  ? <CircularProgress size={13} color="inherit" />
-                  : <SendIcon />
-              }
+              endIcon={submitting ? <CircularProgress size={13} color="inherit" /> : <SendIcon />}
               onClick={onAddComment}
               disabled={submitting || isEmpty || charCount >= MAX_CHARS}
               sx={{
@@ -520,10 +845,7 @@ function ConversationsTab({
                 borderRadius: '8px',
                 fontSize: '0.82rem',
                 '&:hover': { backgroundColor: '#1B193F' },
-                '&.Mui-disabled': {
-                  backgroundColor: '#E5E7EB',
-                  color: '#9CA3AF',
-                },
+                '&.Mui-disabled': { backgroundColor: '#E5E7EB', color: '#9CA3AF' },
               }}
             >
               {submitting ? 'Sending…' : 'Send Reply'}
@@ -531,14 +853,6 @@ function ConversationsTab({
           </Stack>
         </Stack>
       )}
-
-      {/* Disabled Reply Notice */}
-      {COMMENT_ALLOWED.includes(ticket?.status) && !allowUserReply && (
-        <Typography sx={{ mt: 2, fontSize: '0.75rem', color: '#9CA3AF' }}>
-          Replying is disabled by support personnel.
-        </Typography>
-      )}
-
     </Box>
   );
 }
@@ -1238,7 +1552,7 @@ export default function TicketDetailPage() {
     try {
       const [{ data: t }, { data: c }, { data: h }, { data: r }] = await Promise.all([
         getTicketById(id),
-        getTicketComments(id),
+        getTicketCommentsForUser(id, user?.userId),
         getTicketHistory(id),
         getAllowUserReply(id),
       ]);
@@ -1288,7 +1602,7 @@ export default function TicketDetailPage() {
 
       setCommentText('');
       toast.success('Comment added');
-      const { data } = await getTicketComments(id);
+  const { data } = await getTicketCommentsForUser(id, user?.userId);
       setComments(data);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to add comment');
@@ -1405,6 +1719,28 @@ export default function TicketDetailPage() {
         >
           Export CSV
         </Button>
+        <Button
+          variant="contained"
+          startIcon={<DownloadIcon />}
+          onClick={async () => {
+            try {
+              const res = await downloadTicketPdf(ticket.id);
+              const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `ticket-${ticket.ticketNumber || ticket.id}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch {
+              toast.error('Failed to download PDF');
+            }
+          }}
+          sx={{ backgroundColor: '#27235C', color: '#fff', borderRadius: '9px', fontWeight: 600, '&:hover': { backgroundColor: '#1B193F' } }}
+        >
+          Download PDF
+        </Button>
       </Stack>
 
       {/* Primary Header Card */}
@@ -1474,6 +1810,7 @@ export default function TicketDetailPage() {
           {tab === 1 && (
             <ConversationsTab
               comments={comments}
+              setComments={setComments}
               ticket={ticket}
               commentText={commentText}
               setCommentText={setCommentText}
