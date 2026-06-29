@@ -58,13 +58,11 @@ public class CatalogService {
 
     @Transactional
     public void deleteType(Long id) {
-
         if (catRepo.existsByServiceType_Id(id)) {
             throw new DeleteNotAllowedException(
                 "Cannot delete Service Type. Delete all categories, subcategories and services under it first."
             );
         }
-
         typeRepo.deleteById(id);
     }
 
@@ -131,15 +129,29 @@ public class CatalogService {
     }
 
     // ── Services/Items ──────────────────────────────────────────────
-    public List<CatalogDtos.ServiceItemResponse> getAllServices() {
+
+    /**
+     * Manager view: returns ALL services regardless of active status.
+     * End-user view: pass activeOnly=true to get only active services.
+     */
+    public List<CatalogDtos.ServiceItemResponse> getAllServices(boolean activeOnly) {
+        if (activeOnly) {
+            return itemRepo.findByActiveTrue().stream().map(this::toItemResponse).collect(Collectors.toList());
+        }
         return itemRepo.findAll().stream().map(this::toItemResponse).collect(Collectors.toList());
     }
 
-    public List<CatalogDtos.ServiceItemResponse> getServicesBySubcategory(Long subId) {
+    public List<CatalogDtos.ServiceItemResponse> getServicesBySubcategory(Long subId, boolean activeOnly) {
+        if (activeOnly) {
+            return itemRepo.findBySubcategory_IdAndActiveTrue(subId).stream().map(this::toItemResponse).collect(Collectors.toList());
+        }
         return itemRepo.findBySubcategory_Id(subId).stream().map(this::toItemResponse).collect(Collectors.toList());
     }
 
-    public List<CatalogDtos.ServiceItemResponse> getServicesByCategory(Long catId) {
+    public List<CatalogDtos.ServiceItemResponse> getServicesByCategory(Long catId, boolean activeOnly) {
+        if (activeOnly) {
+            return itemRepo.findByCategory_IdAndActiveTrue(catId).stream().map(this::toItemResponse).collect(Collectors.toList());
+        }
         return itemRepo.findByCategory_Id(catId).stream().map(this::toItemResponse).collect(Collectors.toList());
     }
 
@@ -162,6 +174,7 @@ public class CatalogService {
         s.setRequiresApproval(req.isRequiresApproval());
         s.setApprovalRole(req.getApprovalRole());
         s.setAccessDateRequired(req.isAccessDateRequired());
+        s.setActive(true); // new items are active by default
         return toItemResponse(itemRepo.save(s));
     }
 
@@ -188,6 +201,18 @@ public class CatalogService {
         return toItemResponse(itemRepo.save(s));
     }
 
+    /**
+     * Toggle active/inactive status of a catalog item.
+     * Only ITSM Manager should call this (enforced at gateway/controller level).
+     */
+    @Transactional
+    public CatalogDtos.ServiceItemResponse toggleServiceActive(Long id) {
+        com.sez.catalog.entity.Service s = itemRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service not found"));
+        s.setActive(!s.isActive());
+        return toItemResponse(itemRepo.save(s));
+    }
+
     public void deleteService(Long id) {
         itemRepo.deleteById(id);
     }
@@ -196,6 +221,10 @@ public class CatalogService {
     public CatalogDtos.ServiceRequestResponse submitRequest(CatalogDtos.SubmitRequestBody body) {
         com.sez.catalog.entity.Service svc = itemRepo.findById(body.getServiceId())
                 .orElseThrow(() -> new RuntimeException("Service not found"));
+
+        if (!svc.isActive()) {
+            throw new RuntimeException("Cannot submit a request for an inactive service.");
+        }
 
         ServiceRequest req = new ServiceRequest();
         req.setService(svc);
@@ -237,6 +266,7 @@ public class CatalogService {
                     CatalogDtos.SubcategoryTreeNode subNode = new CatalogDtos.SubcategoryTreeNode();
                     subNode.setId(sub.getId());
                     subNode.setName(sub.getName());
+                    // Manager tree shows ALL items including inactive
                     subNode.setItems(itemRepo.findBySubcategory_Id(sub.getId()).stream()
                             .map(this::toItemResponse).collect(Collectors.toList()));
                     return subNode;
@@ -286,6 +316,7 @@ public class CatalogService {
         r.setRequiresApproval(s.isRequiresApproval());
         r.setApprovalRole(s.getApprovalRole());
         r.setAccessDateRequired(s.isAccessDateRequired());
+        r.setActive(s.isActive());
         return r;
     }
 

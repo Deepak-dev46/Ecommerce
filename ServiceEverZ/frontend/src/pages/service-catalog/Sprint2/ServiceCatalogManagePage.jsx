@@ -11,6 +11,8 @@ import {
 import AddIcon        from '@mui/icons-material/Add';
 import EditIcon       from '@mui/icons-material/Edit';
 import DeleteIcon     from '@mui/icons-material/Delete';
+import ToggleOnIcon   from '@mui/icons-material/ToggleOn';
+import ToggleOffIcon  from '@mui/icons-material/ToggleOff';
 import SearchIcon     from '@mui/icons-material/Search';
 import CloseIcon      from '@mui/icons-material/Close';
 import RefreshIcon    from '@mui/icons-material/Refresh';
@@ -28,6 +30,10 @@ import {
   getSubcategoriesByCategory, createSubcategory, updateSubcategory, deleteSubcategory,
   getAllServices,      createService,        updateService,        deleteService,
 } from '../../../api/serviceCatalogApi';
+
+// FIX: toggleServiceActive moved to managerCatalogApi so authAxios sends
+// JWT + X-User-Role header automatically (required by the backend controller).
+import { toggleServiceActive } from '../../../api/managerCatalogApi';
 
 import PageHeader from '../../../components/common/PageHeader';
 
@@ -99,19 +105,20 @@ const selectFocusSx = {
 /* ══════════════════════════════════════════
    SMALL REUSABLE COMPONENTS
 ══════════════════════════════════════════ */
-function StatusChip({ active = true }) {
+function StatusChip({ active }) {
+  const isActive = active !== false; // default true if undefined
   return (
     <Chip
-      label={active ? 'Active' : 'Inactive'}
+      label={isActive ? 'Active' : 'Inactive'}
       size="small"
       sx={{
         height: 22,
         fontSize: '0.68rem',
         fontWeight: 700,
         borderRadius: '6px',
-        bgcolor: active ? '#EDFAF2' : '#F3F4F6',
-        color:   active ? '#16A34A' : TEXT_MUTED,
-        border:  `1px solid ${active ? '#BBF7D0' : BORDER}`,
+        bgcolor: isActive ? '#EDFAF2' : '#F3F4F6',
+        color:   isActive ? '#16A34A' : TEXT_MUTED,
+        border:  `1px solid ${isActive ? '#BBF7D0' : BORDER}`,
         letterSpacing: 0.2,
       }}
     />
@@ -327,7 +334,7 @@ function getColumns(kind, typeMap, catMap, subMap, categories) {
           }}
         />
       ) },
-      { id: 'status', label: 'Status', render: () => <StatusChip /> },
+      { id: 'status', label: 'Status', render: r => <StatusChip active={r.active} /> },
     ];
   }
   return [];
@@ -340,8 +347,10 @@ function RightPanel({
   activeKey, data, loading,
   serviceTypes, categories, subcategories,
   typeMap, catMap, subMap,
-  onAdd, onEdit, onDelete,
+  onAdd, onEdit, onDelete, onToggleActive,
 }) {
+  
+
   const nav = NAV_ITEMS.find(n => n.key === activeKey);
 
   /* filter state */
@@ -723,6 +732,29 @@ function RightPanel({
                           <EditIcon sx={{ fontSize: 14 }} />
                         </IconButton>
                       </Tooltip>
+                      {activeKey === 'item' && (
+                        <Tooltip title={row.active !== false ? 'Deactivate (hide from end users)' : 'Activate (show to end users)'} arrow>
+                          <IconButton
+                            size="small"
+                            onClick={() => onToggleActive(row)}
+                            sx={{
+                              p: 0.7,
+                              borderRadius: '7px',
+                              color: row.active !== false ? '#16A34A' : TEXT_MUTED,
+                              '&:hover': {
+                                bgcolor: row.active !== false ? '#DCFCE7' : NAVY_LIGHT,
+                                color:   row.active !== false ? '#15803D' : NAVY,
+                              },
+                              transition: 'all 0.12s',
+                            }}
+                          >
+                            {row.active !== false
+                              ? <ToggleOnIcon  sx={{ fontSize: 18 }} />
+                              : <ToggleOffIcon sx={{ fontSize: 18 }} />
+                            }
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="Delete" arrow>
                         <IconButton
                           size="small"
@@ -1004,6 +1036,17 @@ export default function ServiceCatalogManagePage() {
     }
   };
 
+  const handleToggleActive = async (row) => {
+    try {
+      await toggleServiceActive(row.id);
+      const action = row.active !== false ? 'deactivated' : 'activated';
+      setTimeout(() => toast.success(`"${row.name}" ${action} successfully.`), 150);
+      loadAll();
+    } catch {
+      setTimeout(() => toast.error('Failed to update status. Please try again.'), 150);
+    }
+  };
+
   const nav = NAV_ITEMS.find(n => n.key === activeKey);
   const dialogTitle = dialog
     ? `${dialog.mode === 'edit' ? 'Edit' : 'Add'} ${NAV_ITEMS.find(n => n.key === dialog?.kind)?.label?.replace(/s$/, 's') ?? ''}`
@@ -1067,6 +1110,7 @@ export default function ServiceCatalogManagePage() {
             onAdd={openAdd}
             onEdit={openEdit}
             onDelete={row => setDeleteTarget({ ...row, kind: activeKey })}
+            onToggleActive={handleToggleActive}
           />
         </Box>
       </Box>
