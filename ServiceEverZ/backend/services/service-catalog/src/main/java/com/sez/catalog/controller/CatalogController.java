@@ -18,7 +18,6 @@ public class CatalogController {
     }
 
     // ── Service Types ──────────────────────────────────────────────
-    // Frontend: GET /serviceTypes
     @GetMapping("/serviceTypes")
     public ResponseEntity<List<CatalogDtos.ServiceTypeResponse>> getAllTypes() {
         return ResponseEntity.ok(catalogService.getAllTypes());
@@ -43,7 +42,6 @@ public class CatalogController {
     }
 
     // ── Categories ──────────────────────────────────────────────
-    // Frontend: GET /categories  or  GET /categories?serviceTypeId=X
     @GetMapping("/categories")
     public ResponseEntity<List<CatalogDtos.CategoryResponse>> getCategories(
             @RequestParam(required = false) Long serviceTypeId) {
@@ -72,7 +70,6 @@ public class CatalogController {
     }
 
     // ── Subcategories ──────────────────────────────────────────────
-    // Frontend: GET /subcategories?categoryId=X
     @GetMapping("/subcategories")
     public ResponseEntity<List<CatalogDtos.SubcategoryResponse>> getSubcategories(
             @RequestParam(required = false) Long categoryId) {
@@ -98,18 +95,24 @@ public class CatalogController {
     }
 
     // ── Services/Items ──────────────────────────────────────────────
-    // Frontend: GET /services  or  GET /services?subcategoryId=X  or  GET /services?categoryId=X
+    /**
+     * GET /services → manager view (all items)
+     * GET /services?activeOnly=true → end-user view (active items only)
+     * GET /services?subcategoryId=X → manager subcategory filter
+     * GET /services?subcategoryId=X&activeOnly=true → end-user subcategory filter
+     */
     @GetMapping("/services")
     public ResponseEntity<List<CatalogDtos.ServiceItemResponse>> getServices(
             @RequestParam(required = false) Long subcategoryId,
-            @RequestParam(required = false) Long categoryId) {
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "false") boolean activeOnly) {
         if (subcategoryId != null) {
-            return ResponseEntity.ok(catalogService.getServicesBySubcategory(subcategoryId));
+            return ResponseEntity.ok(catalogService.getServicesBySubcategory(subcategoryId, activeOnly));
         }
         if (categoryId != null) {
-            return ResponseEntity.ok(catalogService.getServicesByCategory(categoryId));
+            return ResponseEntity.ok(catalogService.getServicesByCategory(categoryId, activeOnly));
         }
-        return ResponseEntity.ok(catalogService.getAllServices());
+        return ResponseEntity.ok(catalogService.getAllServices(activeOnly));
     }
 
     @GetMapping("/services/{id}")
@@ -129,6 +132,17 @@ public class CatalogController {
         return ResponseEntity.ok(catalogService.updateService(id, req));
     }
 
+    /**
+     * PATCH /services/{id}/toggle-active
+     * ITSM Manager toggles a catalog item between active and inactive.
+     * Role check is enforced at the API Gateway via X-User-Role header.
+     */
+    @PatchMapping("/services/{id}/toggle-active")
+    public ResponseEntity<CatalogDtos.ServiceItemResponse> toggleServiceActive(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(catalogService.toggleServiceActive(id));
+    }
+
     @DeleteMapping("/services/{id}")
     public ResponseEntity<Void> deleteService(@PathVariable Long id) {
         catalogService.deleteService(id);
@@ -136,8 +150,7 @@ public class CatalogController {
     }
 
     // ── Requests ──────────────────────────────────────────────
-    // Frontend: POST /requests, GET /requests, GET /requests/:id, PATCH /requests/:id
-    @PostMapping("/re	quests")
+    @PostMapping("/requests")
     public ResponseEntity<CatalogDtos.ServiceRequestResponse> submitRequest(
             @RequestBody CatalogDtos.SubmitRequestBody body) {
         return ResponseEntity.ok(catalogService.submitRequest(body));
@@ -160,20 +173,20 @@ public class CatalogController {
     }
 
     // ── Manager: Catalog Tree ──────────────────────────────────────────────
-    // managerCatalogApi uses: GET api/manager/service-catalog/tree
-    @GetMapping("/api/manager/service-catalog/tree")
+    // FIX: Removed duplicate /api/ prefix. Class is mapped to "api/service-catalog"
+    // so these resolve to: /api/service-catalog/manager/...
+    @GetMapping("/manager/tree")
     public ResponseEntity<List<CatalogDtos.CatalogTreeNode>> getCatalogTree() {
         return ResponseEntity.ok(catalogService.getCatalogTree());
     }
 
-    // Manager category/subcategory/item creation
-    @PostMapping("/api/manager/categories")
+    @PostMapping("/manager/categories")
     public ResponseEntity<CatalogDtos.CategoryResponse> managerCreateCategory(
             @RequestBody CatalogDtos.CategoryRequest req) {
         return ResponseEntity.ok(catalogService.createCategory(req));
     }
 
-    @GetMapping("/api/manager/categories/exists")
+    @GetMapping("/manager/categories/exists")
     public ResponseEntity<Boolean> checkCategoryExists(
             @RequestParam String name, @RequestParam String type) {
         boolean exists = catalogService.getAllCategories().stream()
@@ -181,13 +194,13 @@ public class CatalogController {
         return ResponseEntity.ok(exists);
     }
 
-    @PostMapping("/api/manager/subcategories")
+    @PostMapping("/manager/subcategories")
     public ResponseEntity<CatalogDtos.SubcategoryResponse> managerCreateSubcategory(
             @RequestBody CatalogDtos.SubcategoryRequest req) {
         return ResponseEntity.ok(catalogService.createSubcategory(req));
     }
 
-    @GetMapping("/api/manager/subcategories/exists")
+    @GetMapping("/manager/subcategories/exists")
     public ResponseEntity<Boolean> checkSubcategoryExists(
             @RequestParam String name, @RequestParam Long categoryId) {
         boolean exists = catalogService.getSubcategoriesByCategory(categoryId).stream()
@@ -195,25 +208,23 @@ public class CatalogController {
         return ResponseEntity.ok(exists);
     }
 
-    @PostMapping("/api/manager/items")
+    @PostMapping("/manager/items")
     public ResponseEntity<CatalogDtos.ServiceItemResponse> managerCreateItem(
             @RequestBody CatalogDtos.ServiceItemRequest req) {
         return ResponseEntity.ok(catalogService.createService(req));
     }
 
-    // Also expose roles list (used by Items tab dialog)
     @GetMapping("/roles")
     public ResponseEntity<List<java.util.Map<String, Object>>> getRoles() {
         List<java.util.Map<String, Object>> roles = List.of(
-            java.util.Map.of("id", 1, "name", "ADMIN"),
-            java.util.Map.of("id", 2, "name", "RMO"),
-            java.util.Map.of("id", 3, "name", "ITSM_MANAGER"),
-            java.util.Map.of("id", 4, "name", "END_USER"),
-            java.util.Map.of("id", 5, "name", "SUPPORT_PERSONNEL"),
-            java.util.Map.of("id", 6, "name", "APPROVAL_MANAGER_L1"),
-            java.util.Map.of("id", 7, "name", "APPROVAL_MANAGER_L2"),
-            java.util.Map.of("id", 8, "name", "RESOURCE_OWNER")
-        );
+                java.util.Map.of("id", 1, "name", "ADMIN"),
+                java.util.Map.of("id", 2, "name", "RMO"),
+                java.util.Map.of("id", 3, "name", "ITSM_MANAGER"),
+                java.util.Map.of("id", 4, "name", "END_USER"),
+                java.util.Map.of("id", 5, "name", "SUPPORT_PERSONNEL"),
+                java.util.Map.of("id", 6, "name", "APPROVAL_MANAGER_L1"),
+                java.util.Map.of("id", 7, "name", "APPROVAL_MANAGER_L2"),
+                java.util.Map.of("id", 8, "name", "RESOURCE_OWNER"));
         return ResponseEntity.ok(roles);
     }
 }

@@ -35,8 +35,9 @@ public class Service {
 
     @Column(nullable = false)
     private boolean accessDateRequired = false;
-    public boolean isAccessDateRequired() { return accessDateRequired; }
-    public void setAccessDateRequired(boolean accessDateRequired) { this.accessDateRequired = accessDateRequired; }
+
+    @Column(nullable = false)
+    private boolean active = true;
 
     @Column
     private LocalDateTime createdAt;
@@ -69,14 +70,15 @@ public class Service {
     public boolean isRequiresApproval() { return requiresApproval; }
     public void setRequiresApproval(boolean requiresApproval) { this.requiresApproval = requiresApproval; }
 
+    public boolean isAccessDateRequired() { return accessDateRequired; }
+    public void setAccessDateRequired(boolean accessDateRequired) { this.accessDateRequired = accessDateRequired; }
+
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public Role getApprovalRole() {
-		return approvalRole;
-	}
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-	public void setApprovalRole(Role approvalRole) {
-		this.approvalRole = approvalRole;
-	}
-
-	public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Role getApprovalRole() { return approvalRole; }
+    public void setApprovalRole(Role approvalRole) { this.approvalRole = approvalRole; }
 }

@@ -77,6 +77,7 @@ public class CatalogDtos {
         private boolean requiresApproval;
         private Role approvalRole;
         private boolean accessDateRequired;
+        private boolean active = true;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
@@ -98,6 +99,8 @@ public class CatalogDtos {
 		}
         public boolean isAccessDateRequired() { return accessDateRequired; }
         public void setAccessDateRequired(boolean accessDateRequired) { this.accessDateRequired = accessDateRequired; }
+        public boolean isActive() { return active; }
+        public void setActive(boolean active) { this.active = active; }
     }
 
     public static class ServiceItemResponse {
@@ -110,10 +113,13 @@ public class CatalogDtos {
         private boolean requiresApproval;
         private Role approvalRole;
         private boolean accessDateRequired;
-        
+        private boolean active;
+
         public void setApprovalRole(Role approvalRole) {
 			this.approvalRole = approvalRole;
 		}
+		public boolean isActive() { return active; }
+        public void setActive(boolean active) { this.active = active; }
 		public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
         public String getName() { return name; }
