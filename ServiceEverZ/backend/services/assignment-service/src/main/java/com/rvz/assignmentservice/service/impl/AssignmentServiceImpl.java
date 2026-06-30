@@ -131,12 +131,17 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setEstimatedHours(request.getEstimatedHours());
         assignment.setResponseTimeHours(request.getResponseTimeHours());
         assignment.setRemainingHours(null);
-        assignment.setStatus(AssignmentConstants.STATUS_ASSIGNED);
+//        assignment.setStatus(AssignmentConstants.STATUS_ASSIGNED);
+//        assignment.setAssignedAt(LocalDateTime.now());
+//        assignment.setReassigned(false);
+// 
+//        TicketAssignment saved = ticketRepo.save(assignment);
+        assignment.setStatus(isManual ? AssignmentConstants.STATUS_OPEN : AssignmentConstants.STATUS_ASSIGNED);
         assignment.setAssignedAt(LocalDateTime.now());
+        assignment.setAcknowledgedAt(isManual ? LocalDateTime.now() : null);
         assignment.setReassigned(false);
- 
+         
         TicketAssignment saved = ticketRepo.save(assignment);
- 
         // For MANUAL assignment: write assigneeId + IN_PROGRESS to ticket table immediately
         // (ITSM manager directly confirmed — no acknowledge step required)
         // For AUTO assignment: do NOT write to ticket table yet.

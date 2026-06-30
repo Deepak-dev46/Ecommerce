@@ -12,5 +12,6 @@ public interface TicketAssignmentRepository extends JpaRepository<TicketAssignme
     Optional<TicketAssignment> findByTicketId(Long ticketId);
     List<TicketAssignment> findBySupportPersonId(Long supportPersonId);
     List<TicketAssignment> findByStatus(String status);
+    List<TicketAssignment> findBySupportPersonIdAndStatusNot(Long supportPersonId, String status);
 }
 
